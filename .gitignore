@@ -4,7 +4,7 @@
 _bmad
 
 # Tool-managed runtime dir — gitignored EXCEPT manifest.lock
-.nimble/
+.nimble/*
 !.nimble/manifest.lock
 
 # Python

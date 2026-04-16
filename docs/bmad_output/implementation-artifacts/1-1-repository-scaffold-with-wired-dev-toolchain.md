@@ -1,6 +1,6 @@
 # Story 1.1: Repository Scaffold with Wired Dev Toolchain
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -263,6 +263,18 @@ _No blockers encountered._
 - tests/integration/__init__.py
 - config.yaml
 - .gitignore
+
+### Review Findings
+
+- [x] [Review][Decision] pytest exits code 5 on empty suite — accepted as clean; zero failures, zero errors. Resolves naturally in Story 1.2.
+- [x] [Review][Decision] Typer single-command collapse changes --help output — accepted as-is; Epic 2 adds real commands.
+- [x] [Review][Patch] `.nimble/manifest.lock` gitignore negation is broken [.gitignore:5-6] — fixed: changed `.nimble/` to `.nimble/*`.
+- [x] [Review][Patch] flake8 ignores pyproject.toml — fixed: added `setup.cfg` with `max-line-length = 88`.
+- [x] [Review][Patch] `.gitignore` missing trailing newline [.gitignore] — fixed: added trailing newline.
+- [x] [Review][Defer] pynput import fails on headless Linux without DISPLAY [pyproject.toml:12] — deferred, pre-existing dependency concern; actual imports deferred to Epic 2
+- [x] [Review][Defer] Architecture doc uses `nimble.yaml` in one diagram vs `config.yaml` everywhere else — deferred, pre-existing documentation inconsistency
+- [x] [Review][Defer] worker/ sys.path injection fragility — deferred, worker/entrypoint.py does not exist yet (Epic 2)
+- [x] [Review][Defer] plyer >=2.1 constraint vs NFR17 "no third-party notification dep" contradiction — deferred, planning-level issue
 
 ## Change Log
 
