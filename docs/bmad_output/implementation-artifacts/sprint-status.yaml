@@ -44,7 +44,7 @@ story_location: docs/bmad_output/implementation-artifacts
 development_status:
   # Epic 1: Project Foundation & Dev Toolchain
   epic-1: in-progress
-  1-1-repository-scaffold-with-wired-dev-toolchain: ready-for-dev
+  1-1-repository-scaffold-with-wired-dev-toolchain: review
   1-2-test-infrastructure-foundation: backlog
   1-3-ci-workflow: backlog
   epic-1-retrospective: optional
