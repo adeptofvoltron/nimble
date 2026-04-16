@@ -257,6 +257,27 @@ pynput listener thread
 
 **Isolation guarantee:** A skill exception — including unhandled exceptions in threads spawned within the skill — cannot propagate to the daemon process (NFR11). The worker subprocess is the isolation boundary.
 
+**`sys.path` injection — how community skill workers access `nimble.tools`:**
+
+Community skill workers run under the skill's isolated venv Python, which does not have `nimble` installed. Yet the worker entrypoint must import `nimble.tools` to construct the `ToolRegistry` passed to `skill.run(context, tools)`. The solution is `sys.path` injection at the top of `worker/entrypoint.py`, before any imports:
+
+```python
+import sys
+from pathlib import Path
+
+# Repo root is always two levels up from worker/entrypoint.py
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from nimble.tools import ToolRegistry  # importable in any venv
+```
+
+This works because:
+- The community venv Python executes `worker/entrypoint.py` as a script path — `__file__` is always resolvable to the repo root
+- The venv provides the skill's pip dependencies (e.g. `anthropic`); `sys.path` injection provides `nimble.*`
+- Skill code never imports `nimble` directly — it only uses the `tools` and `context` objects passed as parameters to `run(context, tools)`
+
+The daemon passes the repo root path to the worker as an environment variable (`NIMBLE_REPO_ROOT`) as a belt-and-suspenders fallback, but `Path(__file__).parent.parent` is the primary mechanism.
+
 ### Configuration
 
 **Decision:** `config.yaml` at repo root is the single source of truth for all runtime state
