@@ -1,6 +1,6 @@
 # Story 2.2: X11 Hotkey Adapter (Linux)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -275,7 +275,17 @@ None — implementation was straightforward following Dev Notes exactly.
 - `nimble/hotkeys/x11.py` — replaced stub bodies with real implementation
 - `tests/unit/hotkeys/test_x11.py` — new unit tests (5 tests)
 
+### Review Findings
+
+- [x] [Review][Patch] Headless CI / no DISPLAY — resolved: pynput is imported only via `_pynput_keyboard()` inside `start()` after Wayland checks; unit tests patch `_pynput_keyboard` so collection and CI run without `DISPLAY`. [`nimble/hotkeys/x11.py`, `tests/unit/hotkeys/test_x11.py`]
+
+- [x] [Review][Patch] Double `start()` without `stop()` — resolved: `start()` raises `RuntimeError` if `_listener` is already set. [`nimble/hotkeys/x11.py`]
+
+- [x] [Review][Patch] `stop()` clears listener — resolved: `stop()` sets `_listener = None` after `stop()`/`join()`; added `test_stop_twice_after_start_is_noop`. [`nimble/hotkeys/x11.py`, `tests/unit/hotkeys/test_x11.py`]
+
 ## Change Log
 
 - 2026-04-17: Story created by bmad-create-story workflow
 - 2026-04-17: Story implemented by dev agent (claude-sonnet-4-6)
+- 2026-04-17: Code review (CR) — findings appended above
+- 2026-04-17: Code review patches applied (lazy pynput import, double-start guard, idempotent `stop()`, tests)

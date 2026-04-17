@@ -23,10 +23,25 @@ def test_start_raises_on_wayland_without_xwayland() -> None:
 def test_start_succeeds_with_xwayland_present() -> None:
     adapter = X11HotkeyAdapter()
     mock_listener = MagicMock()
-    with patch("nimble.hotkeys.x11.keyboard.GlobalHotKeys", return_value=mock_listener):
+    mock_keyboard = MagicMock()
+    mock_keyboard.GlobalHotKeys = MagicMock(return_value=mock_listener)
+    with patch("nimble.hotkeys.x11._pynput_keyboard", return_value=mock_keyboard):
         with patch.dict(os.environ, {"WAYLAND_DISPLAY": "wayland-0", "DISPLAY": ":0"}):
             adapter.start()
     mock_listener.start.assert_called_once()
+
+
+def test_start_twice_without_stop_raises() -> None:
+    adapter = X11HotkeyAdapter()
+    mock_listener = MagicMock()
+    mock_keyboard = MagicMock()
+    mock_keyboard.GlobalHotKeys = MagicMock(return_value=mock_listener)
+    with patch("nimble.hotkeys.x11._pynput_keyboard", return_value=mock_keyboard):
+        with patch.dict(os.environ, {"DISPLAY": ":0"}, clear=False):
+            os.environ.pop("WAYLAND_DISPLAY", None)
+            adapter.start()
+            with pytest.raises(RuntimeError, match="already started"):
+                adapter.start()
 
 
 def test_stop_before_start_is_noop() -> None:
@@ -37,10 +52,27 @@ def test_stop_before_start_is_noop() -> None:
 def test_stop_calls_listener_stop_and_join() -> None:
     adapter = X11HotkeyAdapter()
     mock_listener = MagicMock()
-    with patch("nimble.hotkeys.x11.keyboard.GlobalHotKeys", return_value=mock_listener):
+    mock_keyboard = MagicMock()
+    mock_keyboard.GlobalHotKeys = MagicMock(return_value=mock_listener)
+    with patch("nimble.hotkeys.x11._pynput_keyboard", return_value=mock_keyboard):
         with patch.dict(os.environ, {"DISPLAY": ":0"}, clear=False):
             os.environ.pop("WAYLAND_DISPLAY", None)
             adapter.start()
+    adapter.stop()
+    mock_listener.stop.assert_called_once()
+    mock_listener.join.assert_called_once()
+
+
+def test_stop_twice_after_start_is_noop() -> None:
+    adapter = X11HotkeyAdapter()
+    mock_listener = MagicMock()
+    mock_keyboard = MagicMock()
+    mock_keyboard.GlobalHotKeys = MagicMock(return_value=mock_listener)
+    with patch("nimble.hotkeys.x11._pynput_keyboard", return_value=mock_keyboard):
+        with patch.dict(os.environ, {"DISPLAY": ":0"}, clear=False):
+            os.environ.pop("WAYLAND_DISPLAY", None)
+            adapter.start()
+    adapter.stop()
     adapter.stop()
     mock_listener.stop.assert_called_once()
     mock_listener.join.assert_called_once()
