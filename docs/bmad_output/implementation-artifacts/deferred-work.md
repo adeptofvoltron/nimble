@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: code review of 2-3-windows-hotkey-adapter.md (2026-04-17)
+
+- `WindowsHotkeyAdapter.stop()` calls `listener.join()` with no timeout; if the pynput listener thread hangs, shutdown blocks indefinitely. The same pattern exists on `X11HotkeyAdapter`; resolve with a shared policy (timeouts, daemon semantics, or documented limitation) when reliability work targets hotkey shutdown.
+
 ## Deferred from: code review of 1-1-repository-scaffold-with-wired-dev-toolchain (2026-04-16)
 
 - pynput import fails on headless Linux without DISPLAY — `import pynput.keyboard` raises ImportError when DISPLAY is unset (standard CI environments). The HotkeyAdapter ABC boundary (Story 2.1) is the intended isolation, but CI test runs that touch pynput imports will abort.

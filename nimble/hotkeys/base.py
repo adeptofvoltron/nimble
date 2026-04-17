@@ -1,6 +1,13 @@
 import abc
 from collections.abc import Callable
 
+_MODIFIERS = {"ctrl", "shift", "alt", "cmd", "super", "win"}
+
+
+def _to_pynput_format(shortcut: str) -> str:
+    parts = shortcut.lower().split("+")
+    return "+".join(f"<{p}>" if p in _MODIFIERS else p for p in parts)
+
 
 class HotkeyAdapter(abc.ABC):
     @abc.abstractmethod

@@ -3,12 +3,20 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nimble.hotkeys.x11 import X11HotkeyAdapter, _to_pynput_format
+from nimble.hotkeys.base import _to_pynput_format
+from nimble.hotkeys.x11 import X11HotkeyAdapter
 
 
 def test_shortcut_format_conversion() -> None:
     assert _to_pynput_format("ctrl+shift+d") == "<ctrl>+<shift>+d"
     assert _to_pynput_format("ctrl+a") == "<ctrl>+a"
+
+
+def test_register_duplicate_raises_value_error() -> None:
+    adapter = X11HotkeyAdapter()
+    adapter.register("ctrl+shift+d", lambda: None)
+    with pytest.raises(ValueError, match="already registered"):
+        adapter.register("ctrl+shift+d", lambda: None)
 
 
 def test_start_raises_on_wayland_without_xwayland() -> None:
