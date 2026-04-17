@@ -2,3 +2,16 @@
 .cursor
 .claude
 _bmad
+
+# Tool-managed runtime dir — gitignored EXCEPT manifest.lock
+.nimble/*
+!.nimble/manifest.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+*.egg
