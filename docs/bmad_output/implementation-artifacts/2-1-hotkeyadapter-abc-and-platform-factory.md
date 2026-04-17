@@ -1,6 +1,6 @@
 # Story 2.1: HotkeyAdapter ABC and Platform Factory
 
-Status: review
+Status: done
 
 ## Story
 
@@ -265,12 +265,14 @@ None — implementation was straightforward following Dev Notes specifications.
 - `nimble/hotkeys/windows.py` (new — `WindowsHotkeyAdapter` stub)
 - `tests/unit/hotkeys/test_factory.py` (new — factory platform selection tests)
 - `tests/unit/hotkeys/test_base.py` (new — ABC instantiation enforcement test)
+- `tests/unit/hotkeys/test_fake_adapter.py` (new — AC3 `FakeHotkeyAdapter.register` records shortcut)
 
 ### Review Findings
 
-_to be filled_
+- [x] [Review][Patch] No unit test covers acceptance criterion 3 (FakeHotkeyAdapter `register` records shortcut, no OS API) — resolved: `tests/unit/hotkeys/test_fake_adapter.py` added in code review follow-up.
 
 ## Change Log
 
 - 2026-04-17: Story created by bmad-create-story workflow
 - 2026-04-17: Implementation complete by claude-sonnet-4-6 — platform factory and stub adapters created, 4 tests added, all validations pass
+- 2026-04-17: Code review — AC3 unit test added (`test_fake_adapter.py`); story marked done
