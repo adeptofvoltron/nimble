@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-16"
-last_updated: "2026-04-17"  # updated by 2-2 CR fixes → done
+last_updated: "2026-04-17"  # updated by 2-3 code review → done
 project: "pixi (Nimble)"
 project_key: NOKEY
 tracking_system: file-system
@@ -53,7 +53,7 @@ development_status:
   epic-2: in-progress
   2-1-hotkeyadapter-abc-and-platform-factory: done
   2-2-x11-hotkey-adapter-linux: done
-  2-3-windows-hotkey-adapter: backlog
+  2-3-windows-hotkey-adapter: done
   2-4-context-snapshot-assembler: backlog
   2-5-worker-subprocess-ipc-entrypoint: backlog
   2-6-pre-warmed-worker-pool-and-dispatcher: backlog

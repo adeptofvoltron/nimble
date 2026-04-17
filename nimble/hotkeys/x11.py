@@ -4,17 +4,10 @@ import os
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from nimble.hotkeys.base import HotkeyAdapter
+from nimble.hotkeys.base import HotkeyAdapter, _to_pynput_format
 
 if TYPE_CHECKING:
     from pynput.keyboard import GlobalHotKeys
-
-_MODIFIERS = {"ctrl", "shift", "alt", "cmd", "super"}
-
-
-def _to_pynput_format(shortcut: str) -> str:
-    parts = shortcut.lower().split("+")
-    return "+".join(f"<{p}>" if p in _MODIFIERS else p for p in parts)
 
 
 def _pynput_keyboard() -> Any:
@@ -30,7 +23,10 @@ class X11HotkeyAdapter(HotkeyAdapter):
         self._listener: GlobalHotKeys | None = None
 
     def register(self, shortcut: str, callback: Callable[[], None]) -> None:
-        self._hotkeys[_to_pynput_format(shortcut)] = callback
+        key = _to_pynput_format(shortcut)
+        if key in self._hotkeys:
+            raise ValueError(f"Hotkey already registered: {shortcut!r}")
+        self._hotkeys[key] = callback
 
     def start(self) -> None:
         wayland = os.environ.get("WAYLAND_DISPLAY")
