@@ -8,7 +8,10 @@ from nimble.hotkeys.windows import WindowsHotkeyAdapter
 
 def test_register_stores_pynput_format() -> None:
     adapter = WindowsHotkeyAdapter()
-    cb = lambda: None
+
+    def cb() -> None:
+        return None
+
     adapter.register("ctrl+shift+d", cb)
     assert adapter._hotkeys == {"<ctrl>+<shift>+d": cb}
 
@@ -38,7 +41,9 @@ def test_start_warns_on_reserved_hotkey(caplog: pytest.LogCaptureFixture) -> Non
     mock_listener.start.assert_called_once()
 
 
-def test_start_warns_on_ctrl_alt_del_shorthand(caplog: pytest.LogCaptureFixture) -> None:
+def test_start_warns_on_ctrl_alt_del_shorthand(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     adapter = WindowsHotkeyAdapter()
     adapter.register("ctrl+alt+del", lambda: None)
     mock_listener = MagicMock()
