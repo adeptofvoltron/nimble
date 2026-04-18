@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: code review of 2-4-context-snapshot-assembler.md (2026-04-18)
+
+- Worst-case `build_context()` latency: three subprocess calls each capped at 0.1s plus pynput mouse read can approach or exceed the 200ms hotkey budget (NFR1) under contention; validate end-to-end when wired into `runner.py` (Story 2.6).
+
 ## Deferred from: code review of 2-3-windows-hotkey-adapter.md (2026-04-17)
 
 - `WindowsHotkeyAdapter.stop()` calls `listener.join()` with no timeout; if the pynput listener thread hangs, shutdown blocks indefinitely. The same pattern exists on `X11HotkeyAdapter`; resolve with a shared policy (timeouts, daemon semantics, or documented limitation) when reliability work targets hotkey shutdown.
