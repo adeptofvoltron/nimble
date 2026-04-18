@@ -22,7 +22,7 @@ classification:
 
 ## Executive Summary
 
-Nimble is a cross-platform hotkey daemon for Python developers that executes user-defined skills on keypress — without leaving the current context. It targets Python developers on Linux and Windows who automate repetitive tasks (AI queries, text translation, clipboard manipulation, TTS) and are blocked by the platform fragmentation of existing tools: AutoHotkey is Windows-only with a proprietary scripting language; Raycast is macOS-primary with no Linux roadmap; sxhkd is X11-only and actively breaking under the Wayland transition underway across Ubuntu, Fedora, and Arch. No cross-platform, Python-native hotkey skill framework exists. Nimble fills that gap exactly.
+Nimble is a cross-platform hotkey daemon for Python developers that executes user-defined skills on keypress — without leaving the current context. It targets Python developers on Linux, Windows, and macOS who automate repetitive tasks (AI queries, text translation, clipboard manipulation, TTS) and are blocked by the platform fragmentation of existing tools: AutoHotkey is Windows-only with a proprietary scripting language; Raycast is macOS-primary with no Linux roadmap; sxhkd is X11-only and actively breaking under the Wayland transition underway across Ubuntu, Fedora, and Arch. No cross-platform, Python-native hotkey skill framework exists. Nimble fills that gap exactly.
 
 Distribution is a forkable template repository, not an installable package. Users fork, write skills as Python classes, and bind them via YAML. Community skills distribute via `nimble add <repo-url>` — git as the distribution layer, no platform account required. An AI tool primitive is a first-class citizen: `tools.ai.ask(context.selection)` triggers an LLM query from anywhere with a single keypress.
 
@@ -31,7 +31,7 @@ Distribution is a forkable template repository, not an installable package. User
 Four structural differentiators, each absent in every competitor:
 
 1. **Python-native skill execution** — skills are plain Python classes; no proprietary scripting language, no JavaScript, no LISP config syntax
-2. **Cross-platform (Linux + Windows)** — the only tool in this category covering both; Raycast ignores Linux, AutoHotkey ignores Linux, sxhkd ignores Windows
+2. **Cross-platform (Linux, Windows, and macOS)** — Raycast is macOS-primary with no Linux roadmap; AutoHotkey ignores Linux and macOS; sxhkd ignores Windows and macOS. Nimble is the only tool in the category that runs on all three platforms.
 3. **AI as a first-class primitive** — `tools.ai.ask()` is a core tool, not a plugin; 74% of developers are integrating AI and no hotkey tool gives them a keyboard-triggered path to it
 4. **Ownable, forkable distribution** — `nimble add <repo-url>` uses GitHub as a decentralized workflow registry; developers trust git over any marketplace
 
@@ -192,7 +192,7 @@ The timing is structurally favorable: Python adoption hit 57.9% in 2025 (largest
 | `skill-build.md` as living contract (updated with interface changes) | Builder, Maintainer |
 | Security model documentation + permissions display | Skeptic |
 | AI + popup tool primitives | Builder, Consumer |
-| Cross-platform (Linux + Windows) | Builder (Linux), Consumer (Windows) |
+| Cross-platform (Linux, Windows, macOS) | Builder (Linux), Consumer (Windows), any macOS user |
 
 ## Domain-Specific Requirements
 
@@ -203,6 +203,8 @@ The timing is structurally favorable: Python adoption hit 57.9% in 2025 (largest
 **Linux (Wayland):** Global hotkey capture is not available through a standard cross-compositor API. Wayland-native support is deferred to v1.1. Users on Wayland-only desktops must run an X11 compatibility layer (XWayland) for v1 to function. The daemon detects Wayland at startup and prints an actionable error if XWayland is unavailable.
 
 **Windows:** Global hotkey registration via `RegisterHotKey` (Win32) cannot capture OS-reserved combinations (`Win+L`, `Ctrl+Alt+Del`, `Win+R`, etc.). Attempts to bind reserved combinations are silently ignored by the OS. Nimble detects this at daemon start and logs a warning for any binding that matches known reserved combinations.
+
+**macOS:** Global hotkey capture via `pynput` works natively on macOS without elevated privileges. Context capture for `clipboard` uses `pbpaste` (always available). `active_app` uses `osascript` (no extra permissions needed). `selection` capture uses clipboard simulation (save clipboard → simulate Cmd+C → read → restore) in v1; users who grant Accessibility access in System Settings → Privacy & Security get more reliable selection capture in a future story.
 
 ### Privacy Model
 
@@ -240,6 +242,8 @@ Each skill installed via `nimble add` runs in its own isolated Python virtual en
 | `input` group not configured on Linux | Medium | Daemon startup error message with exact fix command |
 | Per-skill venv creation fails (disk space, permissions) | Medium | `nimble add` fails with clear error before modifying config.yaml |
 | Skill venv unavailable at hotkey-fire time | Low | Daemon detects missing venv at load time, disables skill with notification |
+| macOS Accessibility permission not granted | Low | `selection` falls back to clipboard simulation; document in README |
+| macOS Gatekeeper blocks daemon on first run | Low | Document: open System Settings → Privacy & Security → allow nimble |
 
 ## Innovation & Novel Patterns
 
