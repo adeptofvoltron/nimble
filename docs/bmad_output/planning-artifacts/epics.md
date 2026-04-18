@@ -15,7 +15,7 @@ This document provides the complete epic and story breakdown for Nimble, decompo
 
 ### Functional Requirements
 
-FR1: The daemon can capture global keyboard shortcuts triggered from any application context on Linux (X11) and Windows
+FR1: The daemon can capture global keyboard shortcuts triggered from any application context on Linux (X11), Windows, and macOS
 FR2: The daemon can build a context snapshot at hotkey-fire time containing selected text, clipboard content, active application name, and mouse position
 FR3: The daemon can map keyboard shortcut bindings to skills via YAML configuration
 FR4: The daemon can detect a Wayland environment at startup and surface an actionable error message with remediation steps
@@ -166,7 +166,7 @@ The development environment is fully operational — any contributor can clone, 
 **FRs covered:** None directly (architectural prerequisite enabling all future epics)
 
 ### Epic 2: A Hotkey Fires a Skill
-Users can start the Nimble daemon, configure hotkey bindings in YAML, write a Python skill class, and have it execute with a full context snapshot on keypress — the core "it works" experience.
+Users can start the Nimble daemon on Linux, Windows, or macOS, configure hotkey bindings in YAML, write a Python skill class, and have it execute with a full context snapshot on keypress — the core "it works" experience.
 **FRs covered:** FR1, FR2, FR3, FR6, FR7, FR8, FR28, FR37, FR41, FR42, FR45
 
 ### Epic 3: Skills Can Do Real Work — Tool Primitives
@@ -519,6 +519,48 @@ So that I know the daemon is running and responsive without having to write any 
 
 ---
 
+### Story 2.10: Cross-Platform Context Capture (Windows + macOS)
+
+As a skill author on Windows or macOS,
+I want `build_context()` to return real values for `clipboard`, `active_app`, and `selection` — not empty strings,
+So that my skills work the same way regardless of which OS I'm running.
+
+**Acceptance Criteria:**
+
+**Given** `build_context()` is called on Windows
+**When** text is in the clipboard
+**Then** `clipboard` returns that text via PowerShell `Get-Clipboard`
+
+**Given** `build_context()` is called on Windows
+**When** an application window is focused
+**Then** `active_app` returns the window title via `ctypes` (no extra deps)
+
+**Given** `build_context()` is called on Windows
+**When** text is selected in any application
+**Then** `selection` returns that text via clipboard simulation (save → Ctrl+C → read → restore); `""` on any failure
+
+**Given** `build_context()` is called on macOS
+**When** text is in the clipboard
+**Then** `clipboard` returns that text via `pbpaste`
+
+**Given** `build_context()` is called on macOS
+**When** an application is in the foreground
+**Then** `active_app` returns the app name via `osascript`
+
+**Given** `build_context()` is called on macOS
+**When** text is selected in any application
+**Then** `selection` returns that text via clipboard simulation (save → Cmd+C → read → restore); `""` on any failure
+
+**Given** clipboard simulation is used for `selection`
+**When** the simulation completes
+**Then** the original clipboard content is restored — the user's clipboard is not permanently modified
+
+**Given** all OS calls use `timeout=0.1`
+**When** any subprocess hangs
+**Then** it is killed and the field returns `""` — within the 200ms hotkey budget (NFR1)
+
+---
+
 ## Epic 3: Skills Can Do Real Work — Tool Primitives
 
 Skills can query an AI, display popups, read/write the clipboard, speak via TTS, and prompt the user for input — enabling the full range of workflow automation.
@@ -765,9 +807,9 @@ So that I fix config problems in seconds rather than discovering them from a sil
 
 ---
 
-### Story 4.6: Platform Edge Case Handling (Wayland + Windows Reserved Hotkeys)
+### Story 4.6: Platform Edge Case Handling (Wayland + Windows Reserved Hotkeys + macOS Accessibility)
 
-As a user on an unsupported platform configuration,
+As a user on an unsupported or restricted platform configuration,
 I want actionable error messages at daemon startup rather than silent failures,
 So that I know exactly what to fix and how.
 
@@ -785,6 +827,11 @@ So that I know exactly what to fix and how.
 **When** `nimble start` runs on Windows
 **Then** a `WARNING` log entry and startup notification identifies the reserved binding by name (FR5)
 **And** the daemon starts — the warning is non-fatal
+
+**Given** `build_context()` is called on macOS and Accessibility access has not been granted
+**When** clipboard simulation is used for `selection`
+**Then** the daemon logs a one-time INFO message: `"macOS: Accessibility not granted — selection uses clipboard simulation. Grant access in System Settings → Privacy & Security → Accessibility for more reliable capture."`
+**And** the daemon continues normally — this is non-fatal (NFR13)
 
 ---
 

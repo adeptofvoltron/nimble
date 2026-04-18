@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-16"
-last_updated: "2026-04-17"  # updated by 2-3 code review → done
+last_updated: "2026-04-18"  # updated by correct-course: Story 2.10 added, macOS platform scope added
 project: "pixi (Nimble)"
 project_key: NOKEY
 tracking_system: file-system
@@ -54,12 +54,13 @@ development_status:
   2-1-hotkeyadapter-abc-and-platform-factory: done
   2-2-x11-hotkey-adapter-linux: done
   2-3-windows-hotkey-adapter: done
-  2-4-context-snapshot-assembler: backlog
+  2-4-context-snapshot-assembler: done
   2-5-worker-subprocess-ipc-entrypoint: backlog
   2-6-pre-warmed-worker-pool-and-dispatcher: backlog
   2-7-yaml-config-loading-and-skill-registry: backlog
   2-8-daemon-main-loop-and-cli-start-stop-restart: backlog
   2-9-startup-confirmation-hello-world-skill-and-bundled-test-hotkey: backlog
+  2-10-cross-platform-context-capture-windows-macos: backlog
   epic-2-retrospective: optional
 
   # Epic 3: Skills Can Do Real Work — Tool Primitives
@@ -78,7 +79,7 @@ development_status:
   4-3-skill-lifecycle-hooks-on-load-on-error-on-unload: backlog
   4-4-api-version-compatibility-check: backlog
   4-5-yaml-config-validation-and-nimble-validate: backlog
-  4-6-platform-edge-case-handling-wayland-windows-reserved-hotkeys: backlog
+  4-6-platform-edge-case-handling-wayland-windows-reserved-hotkeys-macos-accessibility: backlog
   epic-4-retrospective: optional
 
   # Epic 5: Operational Visibility — Inspect and Manage Without Touching Files
