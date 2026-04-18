@@ -53,8 +53,9 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 - **Linux X11 only in v1** — Wayland deferred to v1.1; Wayland detection + actionable error required at startup
 - **No PyPI packaging in v1** — forkable template repo is the distribution model
 - **Per-skill venv overhead ≤50ms** — venv activation must not break the 200ms end-to-end latency budget
-- **`pynput` / `evdev`** for Linux X11 hotkey capture; **`pywin32`** for Win32 hotkey registration
-- **Native OS notifications only** — libnotify/D-Bus on Linux, Win32 on Windows
+- **`pynput` / `evdev`** for Linux X11 hotkey capture; **`pywin32`** for Win32 hotkey registration; **`pynput`** for macOS (works natively, no additional dep)
+- **Native OS notifications only** — libnotify/D-Bus on Linux, Win32 on Windows, `osascript` on macOS
+- **macOS context capture** — `pbpaste` (clipboard), `osascript` (active app), clipboard simulation via `pynput` keyboard (selection) — no extra deps beyond existing requirements
 - **No sandboxing in v1** — permissions are declarative only
 
 ### Cross-Cutting Concerns Identified
@@ -80,7 +81,8 @@ nimble/                          # repo root (forkable GitHub template)
 │   │   ├── __init__.py
 │   │   ├── base.py              # HotkeyAdapter ABC
 │   │   ├── x11.py               # X11/Linux implementation
-│   │   └── windows.py           # Windows implementation
+│   │   ├── windows.py           # Windows implementation
+│   │   └── macos.py             # macOS implementation (pynput-based)
 │   ├── skills/                  # skill loading, lifecycle, venv orchestration
 │   │   ├── __init__.py
 │   │   ├── loader.py            # discovers + imports skills
