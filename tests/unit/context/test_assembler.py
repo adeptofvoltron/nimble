@@ -73,18 +73,20 @@ def test_active_app_empty_on_subprocess_failure() -> None:
 
 
 def test_mouse_position_happy_path() -> None:
-    mock_ctrl = MagicMock()
-    mock_ctrl.return_value.position = (1920, 1080)
-    with patch("pynput.mouse.Controller", mock_ctrl):
+    mock_mouse = MagicMock()
+    mock_mouse.Controller.return_value.position = (1920, 1080)
+    fake_modules = {"pynput": MagicMock(mouse=mock_mouse), "pynput.mouse": mock_mouse}
+    with patch.dict("sys.modules", fake_modules):
         result = _get_mouse_position()
     assert result == [1920, 1080]
     assert all(isinstance(v, int) for v in result)
 
 
 def test_mouse_position_fallback_on_exception() -> None:
-    mock_ctrl = MagicMock()
-    mock_ctrl.side_effect = RuntimeError("no display server")
-    with patch("pynput.mouse.Controller", mock_ctrl):
+    mock_mouse = MagicMock()
+    mock_mouse.Controller.side_effect = RuntimeError("no display server")
+    fake_modules = {"pynput": MagicMock(mouse=mock_mouse), "pynput.mouse": mock_mouse}
+    with patch.dict("sys.modules", fake_modules):
         result = _get_mouse_position()
     assert result == [0, 0]
 
