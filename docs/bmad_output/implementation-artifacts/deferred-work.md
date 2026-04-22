@@ -1,5 +1,16 @@
 # Deferred Work
 
+## Deferred from: code review of 2-5-worker-subprocess-ipc-entrypoint.md (2026-04-21)
+
+- `__getattr__` future footgun — any future `@property` on `Context` that raises `AttributeError` internally will be silently swallowed and replaced with the migration message (`worker/context.py:22-26`).
+- `from_dict` no runtime type validation for `mouse_position`/`selection`/`clipboard` — daemon is the authoritative source; validate on the daemon side if enforcement is needed.
+- No timeout for hung `skill.run()` — subprocess can block indefinitely with no response to daemon; add timeout mechanism in Story 2.6 or the reliability epic.
+- `skill.run()` signature validation only at first dispatch — mismatched parameter count produces a cryptic TypeError; add signature inspection at load time in a future story.
+- `exec_module` import failures crash the worker before the IPC loop — partially addressed by assert→raise patch; full structured startup error recovery deferred to reliability epic.
+- `json.dumps` can fail if exception `__str__` returns a non-serializable value — extremely rare in practice; defer to future reliability hardening.
+- `skill_file` path in error responses is absolute or relative inconsistently — standardize in the UI presentation layer when error display is designed.
+- `stdout.flush()` failure (BrokenPipeError) not caught — worker crashes; defer to Story 4.x reliability work.
+
 ## Deferred from: code review of 2-4-context-snapshot-assembler.md (2026-04-18)
 
 - Worst-case `build_context()` latency: three subprocess calls each capped at 0.1s plus pynput mouse read can approach or exceed the 200ms hotkey budget (NFR1) under contention; validate end-to-end when wired into `runner.py` (Story 2.6).

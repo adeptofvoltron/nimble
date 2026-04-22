@@ -1,6 +1,6 @@
 # Story 2.5: Worker Subprocess IPC Entrypoint
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -34,46 +34,64 @@ So that skill execution is fully isolated from the daemon process and any skill 
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create `worker/context.py` — worker-side Context class (AC: 1, 4)
-  - [ ] Define `Context` as a `@dataclass` with fields: `selection: str`, `clipboard: str`, `active_app: str`, `mouse_position: list[int]`
-  - [ ] Implement `__getattr__` to raise `AttributeError` with a migration message for any field name not in the dataclass (e.g. `"Context has no field 'selected_text'. Did you mean 'selection'?"`)
-  - [ ] Add `@classmethod from_dict(cls, data: dict[str, Any]) -> Context` that constructs a `Context` from the JSON-decoded invocation payload's `"context"` field
-  - [ ] All fields required — no Optional, no defaults — a missing field is a hard error (broken IPC contract)
-  - [ ] Annotate every parameter and return type (`mypy --strict`)
+- [x] Task 1: Create `worker/context.py` — worker-side Context class (AC: 1, 4)
+  - [x] Define `Context` as a `@dataclass` with fields: `selection: str`, `clipboard: str`, `active_app: str`, `mouse_position: list[int]`
+  - [x] Implement `__getattr__` to raise `AttributeError` with a migration message for any field name not in the dataclass (e.g. `"Context has no field 'selected_text'. Did you mean 'selection'?"`)
+  - [x] Add `@classmethod from_dict(cls, data: dict[str, Any]) -> Context` that constructs a `Context` from the JSON-decoded invocation payload's `"context"` field
+  - [x] All fields required — no Optional, no defaults — a missing field is a hard error (broken IPC contract)
+  - [x] Annotate every parameter and return type (`mypy --strict`)
 
-- [ ] Task 2: Create `worker/entrypoint.py` — IPC loop (AC: 1, 2, 3, 5)
-  - [ ] First two lines (before any other imports): insert repo root into `sys.path` via `Path(__file__).parent.parent`, then check `NIMBLE_REPO_ROOT` env var as fallback
-  - [ ] Set `threading.excepthook` immediately at module startup (before entering the IPC loop) to serialise thread exceptions as error responses on stdout
-  - [ ] Accept skill module path and skill class name as CLI arguments (argv[1], argv[2])
-  - [ ] Dynamically import the skill class from the given path using `importlib`
-  - [ ] Instantiate the skill class once; enter the IPC loop (read stdin line by line)
-  - [ ] Each line: `json.loads()` → extract `invocation_id` + `context` dict → `Context.from_dict(context)` → `skill.run(context, tools)` → write `{"invocation_id": ..., "status": "ok", "error": null}\n` to stdout
-  - [ ] On any exception from `skill.run()`: extract `type`, `message`, `skill_file`, `line` from `traceback`; write error JSON to stdout; flush; continue loop (worker stays alive)
-  - [ ] Every stdout write must call `sys.stdout.flush()` immediately after — daemon reads are blocking
-  - [ ] Pass a stub `ToolRegistry` (or `None`) as `tools` for now — full tool primitives are Story 3.x; worker must not crash if skill ignores `tools`
-  - [ ] Use `sys.stderr` for internal worker logs — never write non-JSON to stdout (would break the IPC framing)
+- [x] Task 2: Create `worker/entrypoint.py` — IPC loop (AC: 1, 2, 3, 5)
+  - [x] First two lines (before any other imports): insert repo root into `sys.path` via `Path(__file__).parent.parent`, then check `NIMBLE_REPO_ROOT` env var as fallback
+  - [x] Set `threading.excepthook` immediately at module startup (before entering the IPC loop) to serialise thread exceptions as error responses on stdout
+  - [x] Accept skill module path and skill class name as CLI arguments (argv[1], argv[2])
+  - [x] Dynamically import the skill class from the given path using `importlib`
+  - [x] Instantiate the skill class once; enter the IPC loop (read stdin line by line)
+  - [x] Each line: `json.loads()` → extract `invocation_id` + `context` dict → `Context.from_dict(context)` → `skill.run(context, tools)` → write `{"invocation_id": ..., "status": "ok", "error": null}\n` to stdout
+  - [x] On any exception from `skill.run()`: extract `type`, `message`, `skill_file`, `line` from `traceback`; write error JSON to stdout; flush; continue loop (worker stays alive)
+  - [x] Every stdout write must call `sys.stdout.flush()` immediately after — daemon reads are blocking
+  - [x] Pass a stub `ToolRegistry` (or `None`) as `tools` for now — full tool primitives are Story 3.x; worker must not crash if skill ignores `tools`
+  - [x] Use `sys.stderr` for internal worker logs — never write non-JSON to stdout (would break the IPC framing)
 
-- [ ] Task 3: Create `tests/unit/worker/test_context.py` (AC: 1, 4)
-  - [ ] Create `tests/unit/worker/__init__.py` — empty, mirrors source structure
-  - [ ] Test `Context.from_dict()` with a fully valid payload → all fields set correctly
-  - [ ] Test `Context.from_dict()` with `mouse_position` as `[1920, 1080]` → `list[int]` not modified
-  - [ ] Test accessing `context.selection` → returns the value
-  - [ ] Test accessing `context.selected_text` (deprecated alias) → raises `AttributeError` with a migration message string
-  - [ ] Test accessing `context.unknown_field` → raises `AttributeError` with a migration message string
+- [x] Task 3: Create `tests/unit/worker/test_context.py` (AC: 1, 4)
+  - [x] Create `tests/unit/worker/__init__.py` — empty, mirrors source structure
+  - [x] Test `Context.from_dict()` with a fully valid payload → all fields set correctly
+  - [x] Test `Context.from_dict()` with `mouse_position` as `[1920, 1080]` → `list[int]` not modified
+  - [x] Test accessing `context.selection` → returns the value
+  - [x] Test accessing `context.selected_text` (deprecated alias) → raises `AttributeError` with a migration message string
+  - [x] Test accessing `context.unknown_field` → raises `AttributeError` with a migration message string
 
-- [ ] Task 4: Create `tests/unit/worker/test_entrypoint.py` (AC: 1, 2, 3, 5)
-  - [ ] Test happy path: valid JSON line on stdin → worker calls `skill.run()` → stdout line is valid JSON with `status: "ok"` and correct `invocation_id`
-  - [ ] Test error path: `skill.run()` raises `KeyError("missing_key")` → stdout contains `status: "error"`, `error.type == "KeyError"`, `error.message` non-empty, `invocation_id` echoed
-  - [ ] Test worker survives error: after one error response, worker processes the next valid invocation correctly
-  - [ ] Test `sys.path` injection: verify repo root is in `sys.path` after worker initialisation (can inspect `sys.path[0]` or patch `Path.parent.parent`)
-  - [ ] Mock `skill.run()` — never execute real skill code in unit tests
-  - [ ] Thread exception test: spawn a thread that raises inside a fake `skill.run()` → verify `threading.excepthook` serialises it to stdout as an error response
+- [x] Task 4: Create `tests/unit/worker/test_entrypoint.py` (AC: 1, 2, 3, 5)
+  - [x] Test happy path: valid JSON line on stdin → worker calls `skill.run()` → stdout line is valid JSON with `status: "ok"` and correct `invocation_id`
+  - [x] Test error path: `skill.run()` raises `KeyError("missing_key")` → stdout contains `status: "error"`, `error.type == "KeyError"`, `error.message` non-empty, `invocation_id` echoed
+  - [x] Test worker survives error: after one error response, worker processes the next valid invocation correctly
+  - [x] Test `sys.path` injection: verify repo root is in `sys.path` after worker initialisation (can inspect `sys.path[0]` or patch `Path.parent.parent`)
+  - [x] Mock `skill.run()` — never execute real skill code in unit tests
+  - [x] Thread exception test: spawn a thread that raises inside a fake `skill.run()` → verify `threading.excepthook` serialises it to stdout as an error response
 
-- [ ] Task 5: Verify quality gates
-  - [ ] `mypy nimble/ tests/ worker/` — exits 0
-  - [ ] `pytest` — all tests pass (existing 31 + new worker tests = target ≥ 40)
-  - [ ] `black --check nimble/ tests/ worker/` — exits 0
-  - [ ] `flake8 nimble/ tests/ worker/` — exits 0
+- [x] Task 5: Verify quality gates
+  - [x] `mypy nimble/ tests/ worker/` — exits 0
+  - [x] `pytest` — all tests pass (existing 31 + new worker tests = target ≥ 40)
+  - [x] `black --check nimble/ tests/ worker/` — exits 0
+  - [x] `flake8 nimble/ tests/ worker/` — exits 0
+
+### Review Findings
+
+- [x] [Review][Decision] Lost invocation_id when JSON parse fails — resolved: `""` accepted as parse-error sentinel; daemon treats empty invocation_id as unattributable error
+- [x] [Review][Decision] Thread-safety of `_current_invocation_id` global — resolved: replaced with `threading.local`; background threads default to `""` sentinel
+- [x] [Review][Patch] Replace `assert` with `if`/`raise` in `_load_skill_class` and wrap startup calls in try/except to emit JSON error rather than crashing the worker [worker/entrypoint.py:47]
+- [x] [Review][Patch] NIMBLE_REPO_ROOT inserted at `sys.path[0]`, overriding the primary `__file__`-derived path — should be lower priority (fallback) [worker/entrypoint.py:11]
+- [x] [Review][Patch] No callable/type check on skill class before instantiation — `getattr(module, class_name)` could return a non-class, failing with cryptic TypeError at dispatch [worker/entrypoint.py:50]
+- [x] [Review][Patch] Redundant `fake_class.return_value = skill_instance` in `_run_with_lines` — fragile and misleading mock setup [tests/unit/worker/test_entrypoint.py:50]
+- [x] [Review][Patch] Thread excepthook test uses un-raised exception — `exc.__traceback__` is `None` so traceback extraction branch is never exercised [tests/unit/worker/test_entrypoint.py:100-102]
+- [x] [Review][Defer] `__getattr__` future footgun — any future `@property` on Context that raises AttributeError internally will be silently swallowed and replaced with the migration message [worker/context.py:22-26] — deferred, pre-existing design concern
+- [x] [Review][Defer] `from_dict` no runtime type validation for `mouse_position`/`selection`/`clipboard` — daemon is authoritative source; validate there if needed [worker/context.py:15-20] — deferred, pre-existing
+- [x] [Review][Defer] No timeout for hung `skill.run()` — worker can block indefinitely with no response to daemon; timeout mechanism not in scope for Story 2.5 — deferred, pre-existing
+- [x] [Review][Defer] `skill.run()` signature validation only at first dispatch — mismatched parameter count produces cryptic TypeError; defer to a future story — deferred, pre-existing
+- [x] [Review][Defer] `exec_module` import failures crash the worker before IPC loop — partially mitigated by assert→raise patch; full structured startup error recovery deferred — deferred, pre-existing
+- [x] [Review][Defer] `json.dumps` can fail if exception `__str__` returns a non-serializable value — extremely rare; defer to reliability hardening — deferred, pre-existing
+- [x] [Review][Defer] `skill_file` path in error responses is absolute or relative inconsistently — standardize in UI layer when error display is designed — deferred, pre-existing
+- [x] [Review][Defer] `stdout.flush()` failure (BrokenPipeError) not caught — worker crashes; defer to Story 4.x reliability work — deferred, pre-existing
 
 ## Dev Notes
 
@@ -333,4 +351,20 @@ claude-sonnet-4-6
 
 ### Completion Notes List
 
+- Implemented `worker/context.py` as a strict dataclass with `from_dict` classmethod and `__getattr__` deprecation guard (FR11).
+- Implemented `worker/entrypoint.py` with sys.path injection at module top, `threading.excepthook` set at startup, stdin IPC loop, error isolation keeping worker alive, and `sys.stdout.flush()` after every write.
+- Passed `None` as `tools` stub per story spec; Tools wiring deferred to Story 3.x.
+- All 11 new tests pass; 42 total tests pass with zero regressions.
+- All quality gates pass: mypy --strict, pytest, black, flake8.
+
 ### File List
+
+- worker/context.py (new)
+- worker/entrypoint.py (new)
+- tests/unit/worker/__init__.py (new)
+- tests/unit/worker/test_context.py (new)
+- tests/unit/worker/test_entrypoint.py (new)
+
+## Change Log
+
+- 2026-04-18: Implemented Story 2.5 — worker subprocess IPC entrypoint. Created Context dataclass with strict field validation and deprecation guard, entrypoint IPC loop with thread exception hook and error isolation, and 11 unit tests covering all ACs. 42 total tests pass; all quality gates (mypy, black, flake8) pass.
