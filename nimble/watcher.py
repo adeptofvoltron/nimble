@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import Any
 
 from watchdog.events import (
+    DirCreatedEvent,
+    DirModifiedEvent,
+    DirMovedEvent,
     FileCreatedEvent,
     FileModifiedEvent,
     FileMovedEvent,
@@ -26,15 +29,15 @@ class _ConfigEventHandler(FileSystemEventHandler):
     def _normalize_path(self, raw_path: str | bytes) -> Path:
         return Path(os.fsdecode(raw_path)).resolve()
 
-    def on_modified(self, event: FileModifiedEvent) -> None:
+    def on_modified(self, event: DirModifiedEvent | FileModifiedEvent) -> None:
         if self._normalize_path(event.src_path) == self._config_path:
             self._reload_fn(self._config_path)
 
-    def on_created(self, event: FileCreatedEvent) -> None:
+    def on_created(self, event: DirCreatedEvent | FileCreatedEvent) -> None:
         if self._normalize_path(event.src_path) == self._config_path:
             self._reload_fn(self._config_path)
 
-    def on_moved(self, event: FileMovedEvent) -> None:
+    def on_moved(self, event: DirMovedEvent | FileMovedEvent) -> None:
         if self._normalize_path(event.dest_path) == self._config_path:
             self._reload_fn(self._config_path)
 
