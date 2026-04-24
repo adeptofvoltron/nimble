@@ -1,6 +1,6 @@
 # Story 3.1: AI Tool Primitive (`tools.ai.ask`)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -609,3 +609,10 @@ claude-sonnet-4-6
 ### Change Log
 
 - 2026-04-24: Implemented Story 3.1 — `tools.ai.ask()` tool primitive with Anthropic and OpenAI provider support, config parsing, worker env-var wiring, and full test suite.
+- 2026-04-24: Code review follow-up — fixed `ConfigError` typo in `parser.py`; strict `NIMBLE_AI_CONFIG` parsing in worker startup (fail fast + tests).
+
+### Review Findings
+
+- [x] [Review][Decision] Malformed or partial `NIMBLE_AI_CONFIG` — **Resolved (option A):** Worker startup now fails with a JSON `status: error` line (same shape as skill load failure) if `NIMBLE_AI_CONFIG` is non-empty but not valid JSON, not a JSON object, or missing `provider` / `model` / `api_key_env`. Empty or whitespace-only env means no AI config (unchanged). [`worker/entrypoint.py` `_build_tools`, `run`]
+
+- [x] [Review][Patch] Typo in `ConfigError` message for missing `ai` subfield — Fixed: removed stray `)` in the f-string. [`nimble/manifest/parser.py:58`]

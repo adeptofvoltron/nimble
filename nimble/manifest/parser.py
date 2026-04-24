@@ -55,7 +55,7 @@ def _parse_ai_config(data: dict[str, Any]) -> AiConfig | None:
         raise ConfigError("'ai' must be a mapping")
     for field in ("provider", "model", "api_key_env"):
         if field not in raw:
-            raise ConfigError(f"'ai' block missing required field: '{field}')")
+            raise ConfigError(f"'ai' block missing required field: '{field}'")
     return AiConfig(
         provider=raw["provider"],
         model=raw["model"],
