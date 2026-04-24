@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from nimble.manifest.parser import ConfigError, NimbleConfig, load_config
+from nimble.manifest.parser import AiConfig, ConfigError, NimbleConfig, load_config
 
 
 def _write_config(tmp_path: Path, content: str) -> Path:
@@ -94,3 +94,37 @@ def test_load_community_skill_parsed_correctly(tmp_path: Path) -> None:
     )
     result = load_config(cfg)
     assert result.skills[0].source == "community"
+
+
+def test_load_config_with_ai_block(tmp_path: Path) -> None:
+    cfg = _write_config(
+        tmp_path,
+        "skills: []\n"
+        "ai:\n"
+        "  provider: anthropic\n"
+        "  model: claude-sonnet-4-6\n"
+        "  api_key_env: ANTHROPIC_API_KEY\n",
+    )
+    result = load_config(cfg)
+    assert isinstance(result.ai, AiConfig)
+    assert result.ai.provider == "anthropic"
+    assert result.ai.model == "claude-sonnet-4-6"
+    assert result.ai.api_key_env == "ANTHROPIC_API_KEY"
+
+
+def test_load_config_without_ai_block(tmp_path: Path) -> None:
+    cfg = _write_config(tmp_path, "skills: []\n")
+    result = load_config(cfg)
+    assert result.ai is None
+
+
+def test_load_config_ai_missing_required_field(tmp_path: Path) -> None:
+    cfg = _write_config(
+        tmp_path,
+        "skills: []\n"
+        "ai:\n"
+        "  provider: anthropic\n"
+        "  api_key_env: ANTHROPIC_API_KEY\n",  # 'model' missing
+    )
+    with pytest.raises(ConfigError, match="model"):
+        load_config(cfg)

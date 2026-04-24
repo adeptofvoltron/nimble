@@ -1,5 +1,6 @@
 import io
 import json
+import os
 import sys
 import threading
 from pathlib import Path
@@ -52,6 +53,46 @@ def _run_with_lines(skill_instance: Any, *lines: str) -> list[dict[str, Any]]:
         if raw:
             results.append(json.loads(raw))
     return results
+
+
+def test_startup_fails_on_invalid_nimble_ai_config_json() -> None:
+    stdin_text = _make_payload("abc-123") + "\n"
+    stdout_buf = io.StringIO()
+    fake_class = MagicMock(return_value=_FakeSkill())
+    with (
+        patch.object(entrypoint_mod, "_load_skill_class", return_value=fake_class),
+        patch.dict(os.environ, {"NIMBLE_AI_CONFIG": "not-json-brace"}, clear=False),
+        patch("sys.stdin", io.StringIO(stdin_text)),
+        patch("sys.stdout", stdout_buf),
+    ):
+        entrypoint_mod.run("fake/path.py", "FakeSkill")
+
+    lines = [ln for ln in stdout_buf.getvalue().splitlines() if ln.strip()]
+    assert len(lines) == 1
+    response = json.loads(lines[0])
+    assert response["status"] == "error"
+    assert response["invocation_id"] == ""
+    assert "NIMBLE_AI_CONFIG" in response["error"]["message"]
+
+
+def test_startup_fails_on_missing_keys_in_nimble_ai_config() -> None:
+    stdin_text = _make_payload("abc-123") + "\n"
+    stdout_buf = io.StringIO()
+    fake_class = MagicMock(return_value=_FakeSkill())
+    bad_config = json.dumps({"provider": "anthropic", "model": "x"})
+    with (
+        patch.object(entrypoint_mod, "_load_skill_class", return_value=fake_class),
+        patch.dict(os.environ, {"NIMBLE_AI_CONFIG": bad_config}, clear=False),
+        patch("sys.stdin", io.StringIO(stdin_text)),
+        patch("sys.stdout", stdout_buf),
+    ):
+        entrypoint_mod.run("fake/path.py", "FakeSkill")
+
+    lines = [ln for ln in stdout_buf.getvalue().splitlines() if ln.strip()]
+    assert len(lines) == 1
+    response = json.loads(lines[0])
+    assert response["status"] == "error"
+    assert "api_key_env" in response["error"]["message"]
 
 
 def test_happy_path_produces_ok_response() -> None:

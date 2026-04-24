@@ -18,6 +18,9 @@ import traceback  # noqa: E402
 from typing import Any  # noqa: E402
 
 from worker.context import Context  # noqa: E402
+from nimble.manifest.parser import AiConfig  # noqa: E402
+from nimble.tools import ToolRegistry  # noqa: E402
+from nimble.tools.ai import AiTool  # noqa: E402
 
 _invocation_local = threading.local()
 
@@ -56,6 +59,36 @@ def _load_skill_class(module_path: str, class_name: str) -> type:
     return skill_class  # type: ignore[no-any-return]
 
 
+def _build_tools() -> ToolRegistry:
+    raw = os.environ.get("NIMBLE_AI_CONFIG", "").strip()
+    ai_config: AiConfig | None = None
+    if raw:
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                f"Invalid NIMBLE_AI_CONFIG: not valid JSON ({exc})"
+            ) from exc
+        if not isinstance(data, dict):
+            raise RuntimeError(
+                "Invalid NIMBLE_AI_CONFIG: expected a JSON object with "
+                "provider, model, and api_key_env"
+            )
+        try:
+            ai_config = AiConfig(
+                provider=data["provider"],
+                model=data["model"],
+                api_key_env=data["api_key_env"],
+            )
+        except KeyError as exc:
+            key = exc.args[0]
+            raise RuntimeError(
+                "Invalid NIMBLE_AI_CONFIG: missing required key "
+                f"{key!r} (need provider, model, api_key_env)"
+            ) from exc
+    return ToolRegistry(ai=AiTool(ai_config))
+
+
 def _extract_error(exc: BaseException) -> dict[str, Any]:
     tb = exc.__traceback__
     last_frame = traceback.extract_tb(tb)[-1] if tb else None
@@ -80,7 +113,17 @@ def run(module_path: str, class_name: str) -> None:
         sys.stdout.write(json.dumps(startup_response) + "\n")
         sys.stdout.flush()
         return
-    tools = None
+    try:
+        tools: ToolRegistry = _build_tools()
+    except RuntimeError as exc:
+        startup_tools_error: dict[str, Any] = {
+            "invocation_id": "",
+            "status": "error",
+            "error": _extract_error(exc),
+        }
+        sys.stdout.write(json.dumps(startup_tools_error) + "\n")
+        sys.stdout.flush()
+        return
 
     for line in sys.stdin:
         line = line.strip()
