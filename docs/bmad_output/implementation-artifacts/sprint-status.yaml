@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-16"
-last_updated: "2026-04-24"  # updated: 2-9 done (code review)
+last_updated: "2026-04-24"  # updated: 2-10 done (code review patch)
 project: "pixi (Nimble)"
 project_key: NOKEY
 tracking_system: file-system
@@ -60,7 +60,7 @@ development_status:
   2-7-yaml-config-loading-and-skill-registry: done
   2-8-daemon-main-loop-and-cli-start-stop-restart: done
   2-9-startup-confirmation-hello-world-skill-and-bundled-test-hotkey: done
-  2-10-cross-platform-context-capture-windows-macos: backlog
+  2-10-cross-platform-context-capture-windows-macos: done
   epic-2-retrospective: optional
 
   # Epic 3: Skills Can Do Real Work — Tool Primitives

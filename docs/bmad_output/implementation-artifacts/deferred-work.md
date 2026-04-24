@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: code review of 2-10-cross-platform-context-capture-windows-macos.md (2026-04-24)
+
+- Windows/macOS `_get_selection()` worst-case wall clock: up to three sequential `subprocess.run(..., timeout=0.1)` calls plus `time.sleep(0.05)` can exceed the 200ms hotkey budget (NFR1 / AC8); validate end-to-end with hotkey wiring. Related: assembler latency note from story 2-4 code review.
+
 ## Deferred from: code review of 2-5-worker-subprocess-ipc-entrypoint.md (2026-04-21)
 
 - `__getattr__` future footgun — any future `@property` on `Context` that raises `AttributeError` internally will be silently swallowed and replaced with the migration message (`worker/context.py:22-26`).
