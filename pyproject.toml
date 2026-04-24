@@ -21,6 +21,7 @@ dev = [
     "flake8==7.3.0",
     "mypy==1.20.1",
     "pytest",
+    "types-PyYAML",
 ]
 
 [project.scripts]
