@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import subprocess
-import sys
 from typing import Any
+
+from nimble.platform import is_linux
 
 
 def _get_selection() -> str:
-    if sys.platform != "linux":
+    if not is_linux():
         return ""
     try:
         result = subprocess.run(
@@ -21,7 +22,7 @@ def _get_selection() -> str:
 
 
 def _get_clipboard() -> str:
-    if sys.platform != "linux":
+    if not is_linux():
         return ""
     try:
         result = subprocess.run(
@@ -36,7 +37,7 @@ def _get_clipboard() -> str:
 
 
 def _get_active_app() -> str:
-    if sys.platform != "linux":
+    if not is_linux():
         return ""
     try:
         result = subprocess.run(

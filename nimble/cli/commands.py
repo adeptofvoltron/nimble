@@ -9,6 +9,7 @@ from pathlib import Path
 import typer
 
 import nimble.state as state
+from nimble.platform import is_windows
 
 app = typer.Typer(help="Nimble — cross-platform Python hotkey daemon.")
 
@@ -36,7 +37,7 @@ def _do_stop() -> bool:
     if pid is None or not state.is_running(pid):
         return False
 
-    if sys.platform == "win32":
+    if is_windows():
         try:
             _terminate_windows(pid)
         except OSError as exc:
@@ -51,7 +52,9 @@ def _do_stop() -> bool:
             state.remove_pid()
             return True
         except PermissionError:
-            typer.echo(f"Nimble failed to stop process {pid}: permission denied", err=True)
+            typer.echo(
+                f"Nimble failed to stop process {pid}: permission denied", err=True
+            )
             return False
 
     for _ in range(100):
@@ -66,7 +69,7 @@ def _do_stop() -> bool:
 
 def _do_start(repo_root: Path, debug: bool) -> int | None:
     nimble_bin = Path(sys.executable).parent / (
-        "nimble.exe" if sys.platform == "win32" else "nimble"
+        "nimble.exe" if is_windows() else "nimble"
     )
     try:
         subprocess.Popen(
@@ -74,7 +77,7 @@ def _do_start(repo_root: Path, debug: bool) -> int | None:
             start_new_session=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            close_fds=(sys.platform != "win32"),
+            close_fds=(not is_windows()),
         )
     except (FileNotFoundError, PermissionError, OSError) as exc:
         typer.echo(f"Nimble failed to launch daemon: {exc}", err=True)

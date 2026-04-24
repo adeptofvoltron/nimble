@@ -25,3 +25,9 @@
 - Architecture doc uses `nimble.yaml` in one early diagram vs `config.yaml` everywhere else — future agents reading the early diagram may scaffold code pointing at the wrong filename.
 - worker/ sys.path injection fragility — `worker/entrypoint.py` (Epic 2) will use `sys.path.insert` to resolve `nimble.*`. If invoked from a non-standard CWD or via symlink, resolution may break. Architecture mentions a `NIMBLE_REPO_ROOT` env var but it is not yet wired.
 - plyer >=2.1 constraint vs NFR17 contradiction — NFR17 says "native OS notifications only, no third-party notification dep" but plyer is listed as a core dependency.
+
+## Deferred from: platform-detection-utility refactor (2026-04-24)
+
+- `is_mac()` has no call sites — macOS hotkey adapter not yet implemented; `get_adapter()` raises `RuntimeError` on darwin. Resolves in Story 2.10 (cross-platform context capture / macOS support).
+- `is_linux()` returns `True` on Android (`sys.platform == "linux"`) — X11 adapter and xclip/xdotool will fail at runtime on Android. Not a current target platform; revisit if Android support is added.
+- Cygwin Python returns `sys.platform == "cygwin"`, so `is_windows()` returns `False` under Cygwin. `get_adapter()` raises `RuntimeError` with a clear message. Acceptable for v1; defer to platform edge-case story if Cygwin support is needed.
