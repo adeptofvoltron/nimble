@@ -12,6 +12,7 @@ dependencies = [
     "pynput>=1.8.1",
     "pyyaml>=6.0",
     "plyer>=2.1",
+    "watchdog>=3.0",
 ]
 
 [project.optional-dependencies]
