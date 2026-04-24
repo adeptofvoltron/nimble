@@ -4,3 +4,8 @@ skills:
     path: skills/hello_world/skill.py
     class_name: HelloWorldSkill
     binding: "ctrl+shift+h"
+
+ai:
+  provider: anthropic
+  model: claude-sonnet-4-6
+  api_key_env: ANTHROPIC_API_KEY

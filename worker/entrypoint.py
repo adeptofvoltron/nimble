@@ -18,6 +18,9 @@ import traceback  # noqa: E402
 from typing import Any  # noqa: E402
 
 from worker.context import Context  # noqa: E402
+from nimble.manifest.parser import AiConfig  # noqa: E402
+from nimble.tools import ToolRegistry  # noqa: E402
+from nimble.tools.ai import AiTool  # noqa: E402
 
 _invocation_local = threading.local()
 
@@ -56,6 +59,22 @@ def _load_skill_class(module_path: str, class_name: str) -> type:
     return skill_class  # type: ignore[no-any-return]
 
 
+def _build_tools() -> ToolRegistry:
+    raw = os.environ.get("NIMBLE_AI_CONFIG", "")
+    ai_config: AiConfig | None = None
+    if raw:
+        try:
+            data = json.loads(raw)
+            ai_config = AiConfig(
+                provider=data["provider"],
+                model=data["model"],
+                api_key_env=data["api_key_env"],
+            )
+        except (json.JSONDecodeError, KeyError):
+            pass
+    return ToolRegistry(ai=AiTool(ai_config))
+
+
 def _extract_error(exc: BaseException) -> dict[str, Any]:
     tb = exc.__traceback__
     last_frame = traceback.extract_tb(tb)[-1] if tb else None
@@ -80,7 +99,7 @@ def run(module_path: str, class_name: str) -> None:
         sys.stdout.write(json.dumps(startup_response) + "\n")
         sys.stdout.flush()
         return
-    tools = None
+    tools: ToolRegistry = _build_tools()
 
     for line in sys.stdin:
         line = line.strip()

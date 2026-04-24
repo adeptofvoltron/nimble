@@ -31,7 +31,6 @@ def run(repo_root: Path, debug: bool = False) -> None:
     notifier = Notifier()
     registry = SkillRegistry()
     adapter = get_adapter()
-    runner = SkillRunner(registry, notifier, repo_root)
 
     config_path = repo_root / "config.yaml"
     watcher: ConfigWatcher | None = None
@@ -44,6 +43,7 @@ def run(repo_root: Path, debug: bool = False) -> None:
         logger.error("Config error on startup: %s", exc)
         sys.exit(1)
 
+    runner = SkillRunner(registry, notifier, repo_root, ai_config=config.ai)
     runner.spawn_workers(validated)
 
     for skill in validated:

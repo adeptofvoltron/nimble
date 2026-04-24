@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
+from nimble.manifest.parser import AiConfig
 from nimble.platform import is_windows
 from nimble.skills.registry import SkillConfig, SkillRegistry, SkillWorker
 
@@ -42,16 +43,32 @@ def _get_python_executable(config: SkillConfig) -> str:
 
 
 class SkillRunner:
-    def __init__(self, registry: SkillRegistry, notifier: Any, repo_root: Path) -> None:
+    def __init__(
+        self,
+        registry: SkillRegistry,
+        notifier: Any,
+        repo_root: Path,
+        ai_config: AiConfig | None = None,
+    ) -> None:
         self._registry = registry
         self._notifier = notifier
         self._repo_root = repo_root
+        self._ai_config = ai_config
 
     def spawn_workers(self, configs: list[SkillConfig]) -> None:
         spawned_workers: list[SkillWorker] = []
         try:
             for config in configs:
                 python_executable = _get_python_executable(config)
+                ai_config_json = ""
+                if self._ai_config is not None:
+                    ai_config_json = json.dumps(
+                        {
+                            "provider": self._ai_config.provider,
+                            "model": self._ai_config.model,
+                            "api_key_env": self._ai_config.api_key_env,
+                        }
+                    )
                 proc = subprocess.Popen(
                     [
                         python_executable,
@@ -62,7 +79,11 @@ class SkillRunner:
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    env={**os.environ, "NIMBLE_REPO_ROOT": str(self._repo_root)},
+                    env={
+                        **os.environ,
+                        "NIMBLE_REPO_ROOT": str(self._repo_root),
+                        "NIMBLE_AI_CONFIG": ai_config_json,
+                    },
                 )
                 worker = SkillWorker(
                     config=config,
