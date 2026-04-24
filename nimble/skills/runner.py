@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
+from nimble.platform import is_windows
 from nimble.skills.registry import SkillConfig, SkillRegistry, SkillWorker
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ def _get_python_executable(config: SkillConfig) -> str:
     if config.source == "local":
         return sys.executable
     base = Path.home() / ".nimble" / "skills" / config.name / ".venv"
-    if sys.platform == "win32":
+    if is_windows():
         return str(base / "Scripts" / "python.exe")
     return str(base / "bin" / "python")
 

@@ -12,6 +12,7 @@ dependencies = [
     "pynput>=1.8.1",
     "pyyaml>=6.0",
     "plyer>=2.1",
+    "watchdog>=3.0",
 ]
 
 [project.optional-dependencies]
@@ -20,6 +21,7 @@ dev = [
     "flake8==7.3.0",
     "mypy==1.20.1",
     "pytest",
+    "types-PyYAML",
 ]
 
 [project.scripts]
