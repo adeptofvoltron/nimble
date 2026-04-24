@@ -1,0 +1,9 @@
+name: hello_world
+version: "1.0.0"
+api_version: 1
+description: "Bundled test skill — fires a notification to confirm the daemon is working"
+entrypoint: skill.py
+class_name: HelloWorldSkill
+permissions: []
+dependencies: []
+author: "Nimble Template"
