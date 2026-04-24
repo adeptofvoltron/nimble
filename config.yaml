@@ -1,2 +1,6 @@
-skills: []
-bindings: []
+skills:
+  - name: hello_world
+    source: local
+    path: skills/hello_world/skill.py
+    class_name: HelloWorldSkill
+    binding: "ctrl+shift+h"

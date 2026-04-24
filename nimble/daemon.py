@@ -61,6 +61,8 @@ def run(repo_root: Path, debug: bool = False) -> None:
     write_pid(os.getpid())
     started = True
 
+    notifier.send("Nimble", "Nimble daemon running.")  # FR41
+
     def _shutdown_worker(name: str) -> None:
         worker = registry.get(name)
         if worker is None:
