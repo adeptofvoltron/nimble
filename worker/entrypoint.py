@@ -21,6 +21,7 @@ from worker.context import Context  # noqa: E402
 from nimble.manifest.parser import AiConfig  # noqa: E402
 from nimble.tools import ToolRegistry  # noqa: E402
 from nimble.tools.ai import AiTool  # noqa: E402
+from nimble.tools.clipboard import ClipboardTool  # noqa: E402
 from nimble.tools.popup import PopupTool  # noqa: E402
 
 _invocation_local = threading.local()
@@ -87,7 +88,9 @@ def _build_tools() -> ToolRegistry:
                 "Invalid NIMBLE_AI_CONFIG: missing required key "
                 f"{key!r} (need provider, model, api_key_env)"
             ) from exc
-    return ToolRegistry(ai=AiTool(ai_config), popup=PopupTool())
+    return ToolRegistry(
+        ai=AiTool(ai_config), popup=PopupTool(), clipboard=ClipboardTool()
+    )
 
 
 def _extract_error(exc: BaseException) -> dict[str, Any]:
