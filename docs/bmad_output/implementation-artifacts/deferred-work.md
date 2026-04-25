@@ -1,5 +1,10 @@
 # Deferred Work
 
+## Deferred from: hello-world-use-popup-tool (2026-04-25)
+
+- `tools: object` and `context: object` annotations in skill files suppress all static analysis attribute-checking — skills are user-copied templates, so using the real types (`ToolRegistry`, `Context`) would catch typos at analysis time. Project-wide pattern; resolve when typing story targets skill API surface.
+- `HelloWorldSkill` has no class/method docstring explaining that `run` is the required entrypoint, what `context` and `tools` contain, etc. — the file is a template for new skill authors. Add guidance when a "skill authoring guide" or template improvement story is scheduled.
+
 ## Deferred from: code review of 2-10-cross-platform-context-capture-windows-macos.md (2026-04-24)
 
 - Windows/macOS `_get_selection()` worst-case wall clock: up to three sequential `subprocess.run(..., timeout=0.1)` calls plus `time.sleep(0.05)` can exceed the 200ms hotkey budget (NFR1 / AC8); validate end-to-end with hotkey wiring. Related: assembler latency note from story 2-4 code review.
