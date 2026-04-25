@@ -23,6 +23,6 @@ def test_hello_world_run_fires_notification() -> None:
     skill = _load_skill()()
     tools = MagicMock()
     skill.run(object(), tools)
-    tools.popup.show.assert_called_once_with("Hello from Nimble! The daemon is working.")
-
-
+    tools.popup.show.assert_called_once_with(
+        "Hello from Nimble! The daemon is working."
+    )
