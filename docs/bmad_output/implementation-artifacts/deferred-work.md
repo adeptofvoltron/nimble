@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: fix hello_world tests after popup refactor (2026-04-25)
+
+- `tests/unit/skills/test_hello_world.py`: `_REPO_ROOT = Path(__file__).parents[3]` is a fragile depth assumption; `assert spec is not None` is stripped under `-O`; `_load_skill()` bypasses the import system and won't catch broken `__init__.py` chains. All pre-existing; address in a test-quality story.
+
 ## Deferred from: hello-world-use-popup-tool (2026-04-25)
 
 - `tools: object` and `context: object` annotations in skill files suppress all static analysis attribute-checking — skills are user-copied templates, so using the real types (`ToolRegistry`, `Context`) would catch typos at analysis time. Project-wide pattern; resolve when typing story targets skill API surface.
