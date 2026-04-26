@@ -1,11 +1,15 @@
+import importlib
 import io
 import json
+import logging
 import os
 import sys
 import threading
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 import worker.entrypoint as entrypoint_mod
 from worker.context import Context
@@ -126,6 +130,28 @@ def test_worker_survives_error_and_processes_next() -> None:
 def test_sys_path_contains_repo_root() -> None:
     repo_root = str(Path(entrypoint_mod.__file__).parent.parent)
     assert repo_root in sys.path
+
+
+def test_log_path_env_wires_file_handler(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    log_path = str(tmp_path / "nimble.log")
+    monkeypatch.setenv("NIMBLE_LOG_PATH", log_path)
+
+    root = logging.getLogger()
+    original_handlers = root.handlers[:]
+    original_level = root.level
+
+    try:
+        with patch("logging.FileHandler") as mock_fh:
+            importlib.reload(entrypoint_mod)
+        mock_fh.assert_called_once_with(log_path)
+    finally:
+        root.setLevel(original_level)
+        for h in root.handlers[:]:
+            if h not in original_handlers:
+                root.removeHandler(h)
+        monkeypatch.delenv("NIMBLE_LOG_PATH", raising=False)
 
 
 def test_thread_excepthook_serialises_to_stdout() -> None:

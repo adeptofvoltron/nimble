@@ -83,6 +83,7 @@ class SkillRunner:
                         **os.environ,
                         "NIMBLE_REPO_ROOT": str(self._repo_root),
                         "NIMBLE_AI_CONFIG": ai_config_json,
+                        "NIMBLE_LOG_PATH": str(Path.home() / ".nimble" / "nimble.log"),
                     },
                 )
                 worker = SkillWorker(

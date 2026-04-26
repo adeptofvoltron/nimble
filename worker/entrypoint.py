@@ -1,3 +1,5 @@
+import logging
+import os
 import sys
 from pathlib import Path
 
@@ -5,11 +7,18 @@ _repo_root = Path(__file__).parent.parent
 if str(_repo_root) not in sys.path:
     sys.path.insert(0, str(_repo_root))
 
-import os  # noqa: E402
-
 _env_root = os.environ.get("NIMBLE_REPO_ROOT")
 if _env_root and _env_root not in sys.path:
     sys.path.append(_env_root)
+
+_log_path = os.environ.get("NIMBLE_LOG_PATH")
+if _log_path:
+    _handler = logging.FileHandler(_log_path)
+    _handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    logging.getLogger().addHandler(_handler)
+    logging.getLogger().setLevel(logging.INFO)
 
 import importlib.util  # noqa: E402
 import json  # noqa: E402
