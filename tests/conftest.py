@@ -2,10 +2,11 @@ from pathlib import Path
 
 import pytest
 
+from nimble.notifier import Notifier
 from tests.unit.hotkeys.fake_adapter import FakeHotkeyAdapter
 
 
-class FakeNotifier:
+class FakeNotifier(Notifier):
     def __init__(self) -> None:
         self.sent: list[tuple[str, str]] = []
 

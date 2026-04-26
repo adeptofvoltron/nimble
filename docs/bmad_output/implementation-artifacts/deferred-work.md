@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: code review of 4-1-per-skill-exception-isolation-and-error-notifications.md (2026-04-26)
+
+- `nimble/daemon.py:152`: If `DispatchResult.status == "error"` but `result.error is None`, `_dispatch` sends no notification and does not log — consider logging a fallback or tightening runner invariants; not introduced by story 4-1 tests.
+
 ## Deferred from: code review of 3-5-input-dialog-tool-primitives (2026-04-26)
 
 - `nimble/tools/input.py:40-71`: `_run_select_dialog` internals (listbox, `on_ok`/`on_cancel`, `curselection` indexing) are unexercised by the test suite — spec deliberately mocked the helper; add integration-level test in a future test-quality story.
