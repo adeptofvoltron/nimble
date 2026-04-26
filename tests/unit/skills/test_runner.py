@@ -342,6 +342,21 @@ def test_shutdown_terminates_all_workers() -> None:
         proc.wait.assert_called_once()
 
 
+def test_spawn_workers_passes_log_path_env() -> None:
+    config = _make_config()
+    registry = SkillRegistry()
+    runner = _make_runner(registry=registry)
+
+    fake_proc = _make_fake_proc({"invocation_id": "abc", "status": "ok", "error": None})
+
+    with patch("subprocess.Popen", return_value=fake_proc) as mock_popen:
+        runner.spawn_workers([config])
+
+    env = mock_popen.call_args.kwargs["env"]
+    assert "NIMBLE_LOG_PATH" in env
+    assert env["NIMBLE_LOG_PATH"].endswith("nimble.log")
+
+
 def test_spawn_workers_partial_failure_cleans_up_started_workers() -> None:
     configs = [_make_config("skill-a"), _make_config("skill-b")]
     registry = SkillRegistry()

@@ -11,6 +11,7 @@ from typing import Any
 
 from nimble.context.assembler import build_context
 from nimble.hotkeys import get_adapter
+from nimble.logging_setup import configure_logging
 from nimble.manifest.parser import ConfigError, load_config
 from nimble.notifier import Notifier
 from nimble.skills.loader import validate_skill_paths
@@ -23,10 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 def run(repo_root: Path, debug: bool = False) -> None:
-    logging.basicConfig(
-        level=logging.DEBUG if debug else logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
+    configure_logging(Path.home() / ".nimble" / "nimble.log", debug)
 
     notifier = Notifier()
     registry = SkillRegistry()
