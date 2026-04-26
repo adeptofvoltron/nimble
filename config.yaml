@@ -3,7 +3,7 @@ skills:
     source: local
     path: skills/hello_world/skill.py
     class_name: HelloWorldSkill
-    binding: "ctrl+shift+h"
+    binding: "ctrl+l"
 
 ai:
   provider: anthropic

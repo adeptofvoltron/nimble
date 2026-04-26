@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from nimble.tools.ai import AiTool
 from nimble.tools.clipboard import ClipboardTool
+from nimble.tools.input import InputTool
 from nimble.tools.popup import PopupTool
 from nimble.tools.tts import TtsTool
 
@@ -14,3 +15,4 @@ class ToolRegistry:
     popup: PopupTool
     clipboard: ClipboardTool
     tts: TtsTool
+    input: InputTool

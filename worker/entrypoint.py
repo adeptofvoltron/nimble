@@ -24,6 +24,7 @@ from nimble.tools.ai import AiTool  # noqa: E402
 from nimble.tools.clipboard import ClipboardTool  # noqa: E402
 from nimble.tools.popup import PopupTool  # noqa: E402
 from nimble.tools.tts import TtsTool  # noqa: E402
+from nimble.tools.input import InputTool  # noqa: E402
 
 _invocation_local = threading.local()
 
@@ -94,6 +95,7 @@ def _build_tools() -> ToolRegistry:
         popup=PopupTool(),
         clipboard=ClipboardTool(),
         tts=TtsTool(),
+        input=InputTool(),
     )
 
 
