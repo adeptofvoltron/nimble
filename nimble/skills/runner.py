@@ -5,6 +5,7 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -16,6 +17,21 @@ from nimble.platform import is_windows
 from nimble.skills.registry import SkillConfig, SkillRegistry, SkillWorker
 
 logger = logging.getLogger(__name__)
+_STARTUP_HANDSHAKE_TIMEOUT_SECONDS = 5.0
+
+
+def _readline_with_timeout(stream: Any, timeout_seconds: float) -> bytes | None:
+    result: dict[str, bytes] = {}
+
+    def _reader() -> None:
+        result["line"] = stream.readline()
+
+    thread = threading.Thread(target=_reader, daemon=True)
+    thread.start()
+    thread.join(timeout=timeout_seconds)
+    if thread.is_alive():
+        return None
+    return result.get("line", b"")
 
 
 @dataclass
@@ -69,6 +85,15 @@ class SkillRunner:
                             "api_key_env": self._ai_config.api_key_env,
                         }
                     )
+                skill_config_json = json.dumps(
+                    {
+                        "name": config.name,
+                        "source": config.source,
+                        "binding": config.binding,
+                        "path": config.path,
+                        "class_name": config.class_name,
+                    }
+                )
                 proc = subprocess.Popen(
                     [
                         python_executable,
@@ -84,28 +109,134 @@ class SkillRunner:
                         "NIMBLE_REPO_ROOT": str(self._repo_root),
                         "NIMBLE_AI_CONFIG": ai_config_json,
                         "NIMBLE_LOG_PATH": str(Path.home() / ".nimble" / "nimble.log"),
+                        "NIMBLE_SKILL_CONFIG": skill_config_json,
                     },
                 )
-                worker = SkillWorker(
-                    config=config,
-                    process=proc,
-                    status="loaded",
-                    python_executable=python_executable,
+                handshake_line = _readline_with_timeout(
+                    proc.stdout,
+                    _STARTUP_HANDSHAKE_TIMEOUT_SECONDS,
                 )
-                # Catch workers that crash immediately during startup.
-                if proc.poll() is not None:
-                    raise RuntimeError(
-                        f"Worker for skill {config.name!r} exited during startup "
-                        f"(exit code {proc.poll()!r})"
+                if handshake_line is None:
+                    self._terminate_worker_process(proc)
+                    failed_worker = SkillWorker(
+                        config=config,
+                        process=proc,
+                        status="failed",
+                        python_executable=python_executable,
                     )
-                self._registry.register(worker)
-                spawned_workers.append(worker)
-                logger.info(
-                    "Skill %s loaded (source=%s, binding=%s)",
-                    config.name,
-                    config.source,
-                    config.binding,
-                )
+                    self._registry.register(failed_worker)
+                    try:
+                        self._notifier.send(
+                            title=f"Nimble — {config.name}",
+                            body="failed to start. Skill disabled until restart.",
+                        )
+                    except Exception:
+                        logger.exception("Notifier failed for skill %s", config.name)
+                    logger.error(
+                        "Skill %s: startup handshake timed out", config.name
+                    )
+                    continue
+
+                if not handshake_line:
+                    self._terminate_worker_process(proc)
+                    failed_worker = SkillWorker(
+                        config=config,
+                        process=proc,
+                        status="failed",
+                        python_executable=python_executable,
+                    )
+                    self._registry.register(failed_worker)
+                    try:
+                        self._notifier.send(
+                            title=f"Nimble — {config.name}",
+                            body="failed to start. Skill disabled until restart.",
+                        )
+                    except Exception:
+                        logger.exception("Notifier failed for skill %s", config.name)
+                    logger.error(
+                        "Skill %s: failed to start (no output from worker)", config.name
+                    )
+                    continue
+
+                try:
+                    handshake = json.loads(handshake_line.decode("utf-8"))
+                except Exception:
+                    handshake = {
+                        "status": "error",
+                        "error": {"message": "malformed handshake"},
+                    }
+
+                if handshake.get("status") == "ok":
+                    worker = SkillWorker(
+                        config=config,
+                        process=proc,
+                        status="loaded",
+                        python_executable=python_executable,
+                    )
+                    self._registry.register(worker)
+                    spawned_workers.append(worker)
+                    logger.info(
+                        "Skill %s loaded (source=%s, binding=%s)",
+                        config.name,
+                        config.source,
+                        config.binding,
+                    )
+                elif handshake.get("phase") == "on_load":
+                    error_data = handshake.get("error")
+                    error_message = (
+                        error_data.get("message", "")
+                        if isinstance(error_data, dict)
+                        else ""
+                    )
+                    self._terminate_worker_process(proc)
+                    failed_worker = SkillWorker(
+                        config=config,
+                        process=proc,
+                        status="failed",
+                        python_executable=python_executable,
+                    )
+                    self._registry.register(failed_worker)
+                    try:
+                        self._notifier.send(
+                            title=f"Nimble — {config.name}",
+                            body=(
+                                f"on_load failed: {error_message}."
+                                " Skill disabled until restart."
+                            ),
+                        )
+                    except Exception:
+                        logger.exception("Notifier failed for skill %s", config.name)
+                    logger.error(
+                        "Skill %s: on_load failed: %s", config.name, error_message
+                    )
+                else:
+                    error_data = handshake.get("error")
+                    error_message = (
+                        error_data.get("message", "")
+                        if isinstance(error_data, dict)
+                        else ""
+                    )
+                    self._terminate_worker_process(proc)
+                    failed_worker = SkillWorker(
+                        config=config,
+                        process=proc,
+                        status="failed",
+                        python_executable=python_executable,
+                    )
+                    self._registry.register(failed_worker)
+                    try:
+                        self._notifier.send(
+                            title=f"Nimble — {config.name}",
+                            body=(
+                                f"failed to load: {error_message}."
+                                " Skill disabled until restart."
+                            ),
+                        )
+                    except Exception:
+                        logger.exception("Notifier failed for skill %s", config.name)
+                    logger.error(
+                        "Skill %s: failed to load: %s", config.name, error_message
+                    )
         except Exception:
             self._shutdown_workers(spawned_workers)
             raise
@@ -219,8 +350,13 @@ class SkillRunner:
 
     def _shutdown_workers(self, workers: list[SkillWorker]) -> None:
         for worker in workers:
-            worker.process.terminate()
-            try:
-                worker.process.wait(timeout=5.0)
-            except subprocess.TimeoutExpired:
-                worker.process.kill()
+            self._terminate_worker_process(worker.process)
+
+    def _terminate_worker_process(self, process: subprocess.Popen[bytes]) -> None:
+        if process.poll() is not None:
+            return
+        process.terminate()
+        try:
+            process.wait(timeout=5.0)
+        except subprocess.TimeoutExpired:
+            process.kill()
