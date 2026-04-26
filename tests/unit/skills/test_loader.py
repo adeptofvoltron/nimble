@@ -66,11 +66,16 @@ def test_full_chain_parser_loader_registry(tmp_path: Path) -> None:
     nimble_config = load_config(config_yaml)
     validated = validate_skill_paths(nimble_config.skills, tmp_path)
 
+    import json as _json
+
     registry = SkillRegistry()
     fake_proc = MagicMock()
     fake_proc.poll.return_value = None
     fake_proc.stdin = MagicMock()
     fake_proc.stdout = MagicMock()
+    fake_proc.stdout.readline.return_value = (
+        _json.dumps({"invocation_id": "", "status": "ok", "error": None}) + "\n"
+    ).encode("utf-8")
     fake_proc.stderr = MagicMock()
 
     with patch("subprocess.Popen", return_value=fake_proc):

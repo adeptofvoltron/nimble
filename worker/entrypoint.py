@@ -26,6 +26,8 @@ import threading  # noqa: E402
 import traceback  # noqa: E402
 from typing import Any  # noqa: E402
 
+logger = logging.getLogger(__name__)
+
 from worker.context import Context  # noqa: E402
 from nimble.manifest.parser import AiConfig  # noqa: E402
 from nimble.tools import ToolRegistry  # noqa: E402
@@ -120,6 +122,16 @@ def _extract_error(exc: BaseException) -> dict[str, Any]:
 
 
 def run(module_path: str, class_name: str) -> None:
+    skill_config: dict[str, object] = {}
+    try:
+        raw_skill_config = json.loads(
+            os.environ.get("NIMBLE_SKILL_CONFIG", "") or "{}"
+        )
+        if isinstance(raw_skill_config, dict):
+            skill_config = raw_skill_config
+    except (json.JSONDecodeError, ValueError):
+        pass
+
     try:
         skill_class = _load_skill_class(module_path, class_name)
         skill = skill_class()
@@ -144,6 +156,24 @@ def run(module_path: str, class_name: str) -> None:
         sys.stdout.flush()
         return
 
+    if hasattr(skill, "on_load"):
+        try:
+            skill.on_load(skill_config)
+        except Exception as exc:
+            on_load_error: dict[str, Any] = {
+                "invocation_id": "",
+                "status": "error",
+                "error": _extract_error(exc),
+                "phase": "on_load",
+            }
+            sys.stdout.write(json.dumps(on_load_error) + "\n")
+            sys.stdout.flush()
+            return
+
+    handshake: dict[str, Any] = {"invocation_id": "", "status": "ok", "error": None}
+    sys.stdout.write(json.dumps(handshake) + "\n")
+    sys.stdout.flush()
+
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -162,6 +192,11 @@ def run(module_path: str, class_name: str) -> None:
                 "error": None,
             }
         except Exception as exc:
+            if hasattr(skill, "on_error"):
+                try:
+                    skill.on_error(exc)
+                except Exception:
+                    logger.warning("on_error raised in skill", exc_info=True)
             response = {
                 "invocation_id": invocation_id,
                 "status": "error",
@@ -169,6 +204,12 @@ def run(module_path: str, class_name: str) -> None:
             }
         sys.stdout.write(json.dumps(response) + "\n")
         sys.stdout.flush()
+
+    if hasattr(skill, "on_unload"):
+        try:
+            skill.on_unload()
+        except Exception:
+            logger.warning("on_unload raised in skill", exc_info=True)
 
 
 if __name__ == "__main__":

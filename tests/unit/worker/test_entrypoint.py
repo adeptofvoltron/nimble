@@ -101,16 +101,18 @@ def test_startup_fails_on_missing_keys_in_nimble_ai_config() -> None:
 
 def test_happy_path_produces_ok_response() -> None:
     results = _run_with_lines(_FakeSkill(), _make_payload("abc-123"))
-    assert len(results) == 1
+    assert len(results) == 2
     assert results[0]["status"] == "ok"
-    assert results[0]["invocation_id"] == "abc-123"
-    assert results[0]["error"] is None
+    assert results[0]["invocation_id"] == ""  # startup handshake
+    assert results[1]["status"] == "ok"
+    assert results[1]["invocation_id"] == "abc-123"
+    assert results[1]["error"] is None
 
 
 def test_error_path_produces_error_response() -> None:
     results = _run_with_lines(_ErrorSkill(), _make_payload("err-uuid"))
-    assert len(results) == 1
-    r = results[0]
+    assert len(results) == 2
+    r = results[1]
     assert r["status"] == "error"
     assert r["invocation_id"] == "err-uuid"
     assert r["error"]["type"] == "KeyError"
@@ -120,11 +122,11 @@ def test_error_path_produces_error_response() -> None:
 def test_worker_survives_error_and_processes_next() -> None:
     lines = [_make_payload("first-id"), _make_payload("second-id")]
     results = _run_with_lines(_ErrorSkill(), *lines)
-    assert len(results) == 2
-    assert results[0]["status"] == "error"
-    assert results[0]["invocation_id"] == "first-id"
+    assert len(results) == 3
     assert results[1]["status"] == "error"
-    assert results[1]["invocation_id"] == "second-id"
+    assert results[1]["invocation_id"] == "first-id"
+    assert results[2]["status"] == "error"
+    assert results[2]["invocation_id"] == "second-id"
 
 
 def test_sys_path_contains_repo_root() -> None:
@@ -152,6 +154,129 @@ def test_log_path_env_wires_file_handler(
             if h not in original_handlers:
                 root.removeHandler(h)
         monkeypatch.delenv("NIMBLE_LOG_PATH", raising=False)
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle hook tests
+# ---------------------------------------------------------------------------
+
+
+class _OnLoadSkill:
+    def __init__(self) -> None:
+        self.loaded = False
+        self.load_config: Any = None
+
+    def on_load(self, config: Any) -> None:
+        self.loaded = True
+        self.load_config = config
+
+    def run(self, context: Context, tools: Any) -> None:
+        pass
+
+
+class _OnLoadFailSkill:
+    def on_load(self, config: Any) -> None:
+        raise ValueError("API key not set")
+
+    def run(self, context: Context, tools: Any) -> None:
+        pass
+
+
+class _OnErrorEnrichSkill:
+    def on_error(self, exc: BaseException) -> None:
+        exc.args = (*exc.args, "enriched context")
+
+    def run(self, context: Context, tools: Any) -> None:
+        raise RuntimeError("original message")
+
+
+class _OnErrorRaisingSkill:
+    def on_error(self, exc: BaseException) -> None:
+        raise TypeError("on_error blew up")
+
+    def run(self, context: Context, tools: Any) -> None:
+        raise ValueError("original error")
+
+
+class _OnUnloadSkill:
+    def __init__(self) -> None:
+        self.unloaded = False
+
+    def on_unload(self) -> None:
+        self.unloaded = True
+
+    def run(self, context: Context, tools: Any) -> None:
+        pass
+
+
+def test_on_load_called_before_ipc_loop() -> None:
+    skill = _OnLoadSkill()
+    results = _run_with_lines(skill, _make_payload("abc-123"))
+    assert skill.loaded is True
+    assert isinstance(skill.load_config, dict)
+    assert len(results) == 2
+    assert results[1]["status"] == "ok"
+    assert results[1]["invocation_id"] == "abc-123"
+
+
+def test_on_load_receives_empty_dict_for_non_object_skill_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    skill = _OnLoadSkill()
+    monkeypatch.setenv("NIMBLE_SKILL_CONFIG", "[]")
+    try:
+        _run_with_lines(skill, _make_payload("abc-123"))
+        assert skill.loaded is True
+        assert skill.load_config == {}
+    finally:
+        monkeypatch.delenv("NIMBLE_SKILL_CONFIG", raising=False)
+
+
+def test_on_load_failure_writes_error_response() -> None:
+    skill = _OnLoadFailSkill()
+    results = _run_with_lines(skill, _make_payload("abc-123"))
+    assert len(results) == 1
+    r = results[0]
+    assert r["status"] == "error"
+    assert r["invocation_id"] == ""
+    assert r["phase"] == "on_load"
+    assert "API key not set" in r["error"]["message"]
+
+
+def test_on_error_called_when_run_raises() -> None:
+    skill = _OnErrorEnrichSkill()
+    results = _run_with_lines(skill, _make_payload("err-id"))
+    assert len(results) == 2
+    r = results[1]
+    assert r["status"] == "error"
+    assert "enriched context" in r["error"]["message"]
+
+
+def test_on_error_itself_raising_uses_original_exception() -> None:
+    skill = _OnErrorRaisingSkill()
+    results = _run_with_lines(skill, _make_payload("err-id"))
+    assert len(results) == 2
+    r = results[1]
+    assert r["status"] == "error"
+    assert r["error"]["type"] == "ValueError"
+    assert "original error" in r["error"]["message"]
+
+
+def test_on_unload_called_after_ipc_loop() -> None:
+    skill = _OnUnloadSkill()
+    _run_with_lines(skill)  # empty stdin — loop exits immediately
+    assert skill.unloaded is True
+
+
+def test_success_handshake_written_before_ipc_loop() -> None:
+    results = _run_with_lines(_FakeSkill(), _make_payload("inv-id"))
+    assert len(results) == 2
+    handshake = results[0]
+    assert handshake["invocation_id"] == ""
+    assert handshake["status"] == "ok"
+    invocation = results[1]
+    assert invocation["invocation_id"] == "inv-id"
+    assert invocation["status"] == "ok"
 
 
 def test_thread_excepthook_serialises_to_stdout() -> None:

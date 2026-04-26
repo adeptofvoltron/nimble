@@ -357,6 +357,139 @@ def test_spawn_workers_passes_log_path_env() -> None:
     assert env["NIMBLE_LOG_PATH"].endswith("nimble.log")
 
 
+def test_spawn_workers_passes_skill_config_env() -> None:
+    config = _make_config()
+    registry = SkillRegistry()
+    runner = _make_runner(registry=registry)
+
+    fake_proc = _make_fake_proc({"invocation_id": "abc", "status": "ok", "error": None})
+
+    with patch("subprocess.Popen", return_value=fake_proc) as mock_popen:
+        runner.spawn_workers([config])
+
+    env = mock_popen.call_args.kwargs["env"]
+    assert "NIMBLE_SKILL_CONFIG" in env
+    skill_cfg = json.loads(env["NIMBLE_SKILL_CONFIG"])
+    assert skill_cfg["name"] == "my-skill"
+    assert skill_cfg["binding"] == "ctrl+shift+a"
+
+
+def test_spawn_workers_on_load_failure_disables_skill_and_continues() -> None:
+    configs = [_make_config("skill-a"), _make_config("skill-b")]
+    registry = SkillRegistry()
+    notifier = FakeNotifier()
+    runner = _make_runner(registry=registry, notifier=notifier)
+
+    on_load_error = {
+        "invocation_id": "",
+        "status": "error",
+        "error": {
+            "type": "ValueError",
+            "message": "API key not set",
+            "skill_file": "",
+            "line": 0,
+        },
+        "phase": "on_load",
+    }
+    first_proc = _make_fake_proc(on_load_error)
+    second_proc = _make_fake_proc(
+        {"invocation_id": "abc", "status": "ok", "error": None}
+    )
+
+    with patch("subprocess.Popen", side_effect=[first_proc, second_proc]):
+        runner.spawn_workers(configs)
+
+    assert registry.get("skill-a") is not None
+    assert registry.get("skill-a").status == "failed"  # type: ignore[union-attr]
+    assert registry.get("skill-b") is not None
+    assert registry.get("skill-b").status == "loaded"  # type: ignore[union-attr]
+    assert len(notifier.sent) == 1
+    title, body = notifier.sent[0]
+    assert title == "Nimble — skill-a"
+    assert "on_load failed" in body
+    assert "API key not set" in body
+
+
+def test_spawn_workers_startup_crash_no_output_disables_gracefully() -> None:
+    config = _make_config()
+    registry = SkillRegistry()
+    notifier = FakeNotifier()
+    runner = _make_runner(registry=registry, notifier=notifier)
+
+    crashed_proc = _make_fake_proc({})
+    crashed_proc.stdout.readline.return_value = b""
+
+    with patch("subprocess.Popen", return_value=crashed_proc):
+        runner.spawn_workers([config])  # must not raise
+
+    assert registry.get("my-skill") is not None
+    assert registry.get("my-skill").status == "failed"  # type: ignore[union-attr]
+    assert len(notifier.sent) == 1
+    title, body = notifier.sent[0]
+    assert title == "Nimble — my-skill"
+    assert "failed to start" in body
+
+
+def test_spawn_workers_startup_handshake_timeout_disables_and_terminates() -> None:
+    config = _make_config()
+    registry = SkillRegistry()
+    notifier = FakeNotifier()
+    runner = _make_runner(registry=registry, notifier=notifier)
+
+    hung_proc = _make_fake_proc({})
+
+    with (
+        patch("subprocess.Popen", return_value=hung_proc),
+        patch("nimble.skills.runner._readline_with_timeout", return_value=None),
+    ):
+        runner.spawn_workers([config])
+
+    assert registry.get("my-skill") is not None
+    assert registry.get("my-skill").status == "failed"  # type: ignore[union-attr]
+    hung_proc.terminate.assert_called_once()
+    assert len(notifier.sent) == 1
+    title, body = notifier.sent[0]
+    assert title == "Nimble — my-skill"
+    assert "failed to start" in body
+
+
+def test_spawn_workers_on_load_failure_terminates_failed_worker_process() -> None:
+    config = _make_config("skill-a")
+    registry = SkillRegistry()
+    notifier = FakeNotifier()
+    runner = _make_runner(registry=registry, notifier=notifier)
+
+    on_load_error = {
+        "invocation_id": "",
+        "status": "error",
+        "error": {"type": "ValueError", "message": "API key not set"},
+        "phase": "on_load",
+    }
+    failed_proc = _make_fake_proc(on_load_error)
+
+    with patch("subprocess.Popen", return_value=failed_proc):
+        runner.spawn_workers([config])
+
+    assert registry.get("skill-a") is not None
+    assert registry.get("skill-a").status == "failed"  # type: ignore[union-attr]
+    failed_proc.terminate.assert_called_once()
+
+
+def test_spawn_workers_reads_ok_handshake_and_registers_worker() -> None:
+    config = _make_config()
+    registry = SkillRegistry()
+    runner = _make_runner(registry=registry)
+
+    fake_proc = _make_fake_proc({"invocation_id": "", "status": "ok", "error": None})
+
+    with patch("subprocess.Popen", return_value=fake_proc):
+        runner.spawn_workers([config])
+
+    worker = registry.get("my-skill")
+    assert worker is not None
+    assert worker.status == "loaded"
+
+
 def test_spawn_workers_partial_failure_cleans_up_started_workers() -> None:
     configs = [_make_config("skill-a"), _make_config("skill-b")]
     registry = SkillRegistry()
