@@ -82,6 +82,15 @@ so that I can build interactive workflows that require user input at execution t
 
 - [x] [Review][Patch] Unused module logger in `nimble/tools/input.py` — **Resolved:** `logger.warning(..., exc_info=True)` added in both `except` paths before re-raising `RuntimeError`.
 
+- [x] [Review][Defer] `_run_select_dialog` internals not directly tested [nimble/tools/input.py:40-71] — deferred; deliberate spec decision to test `select()` via public API with `_run_select_dialog` patched; listbox, `on_ok`/`on_cancel`, and `curselection` indexing unexercised by unit tests
+- [x] [Review][Defer] `grab_set()` may fail silently on some X11/EWMH window managers without prior `win.update()` [nimble/tools/input.py:47] — deferred; standard tkinter mitigation is `win.update()` before `win.grab_set()`; theoretical under normal desktop use
+- [x] [Review][Defer] `except Exception` masks internal bugs as misleading `RuntimeError("Input dialog is not available")` [nimble/tools/input.py:21-23,35-37] — deferred; consistent with TTS sibling pattern; construction errors and `root.destroy()` failures surface as dependency errors
+- [x] [Review][Defer] Double-destroy: `root.destroy()` runs after `win` already destroyed inside `_run_select_dialog` [nimble/tools/input.py] — deferred; tkinter tolerates silent double-destroy; cosmetic resource management oddity
+- [x] [Review][Defer] Thread-safety: `ask()`/`select()` must be called from the main thread; cross-thread use raises misleading error [nimble/tools/input.py:10] — deferred; pre-existing pattern across all tool primitives; document in skill authoring guide
+- [x] [Review][Defer] `ask()` returns `""` for empty-field OK (falsy but not `None`) — callers using `if result:` mishandle this [nimble/tools/input.py:13-22] — deferred; tkinter `simpledialog.askstring` design; not a spec violation; document in skill authoring guide
+- [x] [Review][Defer] `select()` accepts `choices=[]` with no guard — renders zero-height listbox, OK returns `None` indistinguishable from cancel [nimble/tools/input.py:24] — deferred; out of spec scope; add `ValueError` guard in future hardening story
+- [x] [Review][Defer] No test for `root.destroy()` path when `askstring` raises after `tk.Tk()` succeeds [tests/unit/tools/test_input.py] — deferred; unavailability tests patch tkinter=None so `Tk()` never runs; the `finally` guard is unverified by the current suite
+
 ## Dev Notes
 
 ### Role in the Daemon Architecture

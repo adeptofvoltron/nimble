@@ -1,5 +1,16 @@
 # Deferred Work
 
+## Deferred from: code review of 3-5-input-dialog-tool-primitives (2026-04-26)
+
+- `nimble/tools/input.py:40-71`: `_run_select_dialog` internals (listbox, `on_ok`/`on_cancel`, `curselection` indexing) are unexercised by the test suite — spec deliberately mocked the helper; add integration-level test in a future test-quality story.
+- `nimble/tools/input.py:47`: `win.grab_set()` may fail on some X11/EWMH WMs without `win.update()` first — add `win.update()` before `win.grab_set()` in a future hardening pass.
+- `nimble/tools/input.py:21-23,35-37`: `except Exception` swallows internal bugs as `RuntimeError("Input dialog is not available")` — consistent with TTS pattern; revisit with a structured exception hierarchy in reliability epic.
+- `nimble/tools/input.py`: `root.destroy()` runs in `select()` `finally` after `_run_select_dialog` already destroyed `win` — tkinter tolerates this; revisit if double-destroy produces noise in logs.
+- `nimble/tools/input.py`: `ask()`/`select()` are not thread-safe (tkinter main-thread requirement); cross-thread call produces a misleading error message — pre-existing pattern across all tools; document in skill authoring guide (Story 7.1).
+- `nimble/tools/input.py:13-22`: `ask()` returns `""` for empty-field OK (falsy, not `None`); skill authors using `if result:` will mishandle silent empty input — document clearly in skill authoring guide (Story 7.1).
+- `nimble/tools/input.py:24`: `select()` accepts `choices=[]` with no guard — opens zero-height listbox, OK silently returns `None`; add `if not choices: raise ValueError` in future hardening story.
+- `tests/unit/tools/test_input.py`: No test covers the path where `tk.Tk()` succeeds but `askstring` raises — the `finally: root.destroy()` guard is unverified; add in a future test-quality story.
+
 ## Deferred from: fix hello_world tests after popup refactor (2026-04-25)
 
 - `tests/unit/skills/test_hello_world.py`: `_REPO_ROOT = Path(__file__).parents[3]` is a fragile depth assumption; `assert spec is not None` is stripped under `-O`; `_load_skill()` bypasses the import system and won't catch broken `__init__.py` chains. All pre-existing; address in a test-quality story.
