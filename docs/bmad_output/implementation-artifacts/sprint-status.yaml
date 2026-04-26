@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-16"
-last_updated: "2026-04-26"  # updated by dev agent
+last_updated: "2026-04-26"  # updated after code review (story 3-5 done)
 project: "pixi (Nimble)"
 project_key: NOKEY
 tracking_system: file-system
@@ -69,7 +69,7 @@ development_status:
   3-2-popup-tool-primitive-tools-popup-show: done
   3-3-clipboard-tool-primitives-tools-clipboard-get-tools-clipboard-set: done
   3-4-tts-tool-primitive-tools-tts-speak: done
-  3-5-input-dialog-tool-primitives-tools-input-ask-tools-input-select: backlog
+  3-5-input-dialog-tool-primitives-tools-input-ask-tools-input-select: done
   epic-3-retrospective: optional
 
   # Epic 4: The Daemon Never Silently Fails — Reliability & Error Handling
