@@ -113,7 +113,7 @@ class SkillRunner:
                     },
                 )
                 handshake_line = _readline_with_timeout(
-                    proc.stdout,  # type: ignore[arg-type]
+                    proc.stdout,
                     _STARTUP_HANDSHAKE_TIMEOUT_SECONDS,
                 )
                 if handshake_line is None:
