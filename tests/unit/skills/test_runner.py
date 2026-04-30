@@ -505,3 +505,123 @@ def test_spawn_workers_partial_failure_cleans_up_started_workers() -> None:
             runner.spawn_workers(configs)
 
     first_proc.terminate.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# api_version check tests
+# ---------------------------------------------------------------------------
+
+
+def test_spawn_workers_rejects_skill_with_too_high_api_version() -> None:
+    config = _make_config()
+    registry = SkillRegistry()
+    notifier = FakeNotifier()
+    runner = _make_runner(registry=registry, notifier=notifier)
+
+    with (
+        patch(
+            "nimble.skills.runner.read_skill_manifest",
+            return_value={"api_version": 999},
+        ),
+        patch("subprocess.Popen") as mock_popen,
+    ):
+        runner.spawn_workers([config])
+
+    mock_popen.assert_not_called()
+    assert registry.get("my-skill") is None
+    assert len(notifier.sent) == 1
+    title, body = notifier.sent[0]
+    assert title == "Nimble — my-skill"
+    assert "Skill my-skill requires Nimble api_version 999" in body
+    assert "upgrade your daemon" in body
+
+
+def test_spawn_workers_warns_for_old_api_version() -> None:
+    config = _make_config()
+    registry = SkillRegistry()
+    notifier = FakeNotifier()
+    runner = _make_runner(registry=registry, notifier=notifier)
+
+    fake_proc = _make_fake_proc({"invocation_id": "abc", "status": "ok", "error": None})
+
+    with (
+        patch(
+            "nimble.skills.runner.read_skill_manifest", return_value={"api_version": 0}
+        ),
+        patch("subprocess.Popen", return_value=fake_proc),
+        patch("nimble.skills.runner.logger") as mock_logger,
+    ):
+        runner.spawn_workers([config])
+
+    assert registry.get("my-skill") is not None
+    assert registry.get("my-skill").status == "loaded"  # type: ignore[union-attr]
+    assert len(notifier.sent) == 0
+    mock_logger.warning.assert_called_once()
+    warning_msg = mock_logger.warning.call_args[0][0]
+    assert "api_version" in warning_msg
+
+
+def test_spawn_workers_loads_normally_for_matching_api_version() -> None:
+    config = _make_config()
+    registry = SkillRegistry()
+    notifier = FakeNotifier()
+    runner = _make_runner(registry=registry, notifier=notifier)
+
+    fake_proc = _make_fake_proc({"invocation_id": "abc", "status": "ok", "error": None})
+
+    with (
+        patch(
+            "nimble.skills.runner.read_skill_manifest", return_value={"api_version": 1}
+        ),
+        patch("subprocess.Popen", return_value=fake_proc),
+    ):
+        runner.spawn_workers([config])
+
+    assert registry.get("my-skill") is not None
+    assert registry.get("my-skill").status == "loaded"  # type: ignore[union-attr]
+    assert len(notifier.sent) == 0
+
+
+def test_spawn_workers_skips_check_when_no_manifest() -> None:
+    config = _make_config()
+    registry = SkillRegistry()
+    notifier = FakeNotifier()
+    runner = _make_runner(registry=registry, notifier=notifier)
+
+    fake_proc = _make_fake_proc({"invocation_id": "abc", "status": "ok", "error": None})
+
+    with (
+        patch("nimble.skills.runner.read_skill_manifest", return_value=None),
+        patch("subprocess.Popen", return_value=fake_proc),
+        patch("nimble.skills.runner.logger") as mock_logger,
+    ):
+        runner.spawn_workers([config])
+
+    assert registry.get("my-skill") is not None
+    assert registry.get("my-skill").status == "loaded"  # type: ignore[union-attr]
+    assert len(notifier.sent) == 0
+    mock_logger.warning.assert_not_called()
+
+
+def test_spawn_workers_skips_check_when_manifest_has_no_api_version() -> None:
+    config = _make_config()
+    registry = SkillRegistry()
+    notifier = FakeNotifier()
+    runner = _make_runner(registry=registry, notifier=notifier)
+
+    fake_proc = _make_fake_proc({"invocation_id": "abc", "status": "ok", "error": None})
+
+    with (
+        patch(
+            "nimble.skills.runner.read_skill_manifest",
+            return_value={"name": "my-skill"},
+        ),
+        patch("subprocess.Popen", return_value=fake_proc),
+        patch("nimble.skills.runner.logger") as mock_logger,
+    ):
+        runner.spawn_workers([config])
+
+    assert registry.get("my-skill") is not None
+    assert registry.get("my-skill").status == "loaded"  # type: ignore[union-attr]
+    assert len(notifier.sent) == 0
+    mock_logger.warning.assert_not_called()

@@ -12,7 +12,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from nimble.manifest.parser import AiConfig
+from nimble import SUPPORTED_API_VERSION
+from nimble.manifest.parser import AiConfig, read_skill_manifest
 from nimble.platform import is_windows
 from nimble.skills.registry import SkillConfig, SkillRegistry, SkillWorker
 
@@ -75,6 +76,38 @@ class SkillRunner:
         spawned_workers: list[SkillWorker] = []
         try:
             for config in configs:
+                manifest = read_skill_manifest(config, self._repo_root)
+                if manifest is not None:
+                    skill_api_version = manifest.get("api_version")
+                    if type(skill_api_version) is int:
+                        if skill_api_version > SUPPORTED_API_VERSION:
+                            try:
+                                self._notifier.send(
+                                    title=f"Nimble — {config.name}",
+                                    body=(
+                                        f"Skill {config.name} requires Nimble"
+                                        f" api_version {skill_api_version}"
+                                        " — upgrade your daemon"
+                                    ),
+                                )
+                            except Exception:
+                                logger.exception(
+                                    "Notifier failed for skill %s", config.name
+                                )
+                            logger.error(
+                                "Skill %s: requires api_version %d, daemon supports %d",
+                                config.name,
+                                skill_api_version,
+                                SUPPORTED_API_VERSION,
+                            )
+                            continue
+                        elif skill_api_version < SUPPORTED_API_VERSION:
+                            logger.warning(
+                                "Skill %s uses api_version %d"
+                                " — deprecated fields will raise AttributeError",
+                                config.name,
+                                skill_api_version,
+                            )
                 python_executable = _get_python_executable(config)
                 ai_config_json = ""
                 if self._ai_config is not None:
@@ -132,9 +165,7 @@ class SkillRunner:
                         )
                     except Exception:
                         logger.exception("Notifier failed for skill %s", config.name)
-                    logger.error(
-                        "Skill %s: startup handshake timed out", config.name
-                    )
+                    logger.error("Skill %s: startup handshake timed out", config.name)
                     continue
 
                 if not handshake_line:

@@ -124,9 +124,7 @@ def _extract_error(exc: BaseException) -> dict[str, Any]:
 def run(module_path: str, class_name: str) -> None:
     skill_config: dict[str, object] = {}
     try:
-        raw_skill_config = json.loads(
-            os.environ.get("NIMBLE_SKILL_CONFIG", "") or "{}"
-        )
+        raw_skill_config = json.loads(os.environ.get("NIMBLE_SKILL_CONFIG", "") or "{}")
         if isinstance(raw_skill_config, dict):
             skill_config = raw_skill_config
     except (json.JSONDecodeError, ValueError):
