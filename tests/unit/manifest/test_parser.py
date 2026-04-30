@@ -185,7 +185,9 @@ def test_read_skill_manifest_returns_none_when_not_dict(tmp_path: Path) -> None:
     assert result is None
 
 
-def test_read_skill_manifest_returns_none_for_absolute_skill_path(tmp_path: Path) -> None:
+def test_read_skill_manifest_returns_none_for_absolute_skill_path(
+    tmp_path: Path,
+) -> None:
     skill_dir = tmp_path / "skills" / "my_skill"
     skill_dir.mkdir(parents=True)
     (skill_dir / "manifest.yaml").write_text("api_version: 1\n")
