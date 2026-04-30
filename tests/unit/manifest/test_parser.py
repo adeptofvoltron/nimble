@@ -4,7 +4,24 @@ from pathlib import Path
 
 import pytest
 
-from nimble.manifest.parser import AiConfig, ConfigError, NimbleConfig, load_config
+from nimble.manifest.parser import (
+    AiConfig,
+    ConfigError,
+    NimbleConfig,
+    load_config,
+    read_skill_manifest,
+)
+from nimble.skills.registry import SkillConfig
+
+
+def _make_skill_config(path: str = "skills/my_skill/skill.py") -> SkillConfig:
+    return SkillConfig(
+        name="my_skill",
+        source="local",
+        binding="ctrl+x",
+        path=path,
+        class_name="MySkill",
+    )
 
 
 def _write_config(tmp_path: Path, content: str) -> Path:
@@ -128,3 +145,58 @@ def test_load_config_ai_missing_required_field(tmp_path: Path) -> None:
     )
     with pytest.raises(ConfigError, match="model"):
         load_config(cfg)
+
+
+# ---------------------------------------------------------------------------
+# read_skill_manifest tests
+# ---------------------------------------------------------------------------
+
+
+def test_read_skill_manifest_returns_none_when_no_manifest(tmp_path: Path) -> None:
+    config = _make_skill_config()
+    result = read_skill_manifest(config, tmp_path)
+    assert result is None
+
+
+def test_read_skill_manifest_returns_dict_when_manifest_exists(tmp_path: Path) -> None:
+    skill_dir = tmp_path / "skills" / "my_skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "manifest.yaml").write_text("api_version: 1\nname: my_skill\n")
+    config = _make_skill_config()
+    result = read_skill_manifest(config, tmp_path)
+    assert result == {"api_version": 1, "name": "my_skill"}
+
+
+def test_read_skill_manifest_returns_none_on_invalid_yaml(tmp_path: Path) -> None:
+    skill_dir = tmp_path / "skills" / "my_skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "manifest.yaml").write_text("key: [\ninvalid yaml")
+    config = _make_skill_config()
+    result = read_skill_manifest(config, tmp_path)
+    assert result is None
+
+
+def test_read_skill_manifest_returns_none_when_not_dict(tmp_path: Path) -> None:
+    skill_dir = tmp_path / "skills" / "my_skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "manifest.yaml").write_text("just a string\n")
+    config = _make_skill_config()
+    result = read_skill_manifest(config, tmp_path)
+    assert result is None
+
+
+def test_read_skill_manifest_returns_none_for_absolute_skill_path(tmp_path: Path) -> None:
+    skill_dir = tmp_path / "skills" / "my_skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "manifest.yaml").write_text("api_version: 1\n")
+    config = _make_skill_config(path="/tmp/my_skill/skill.py")
+    result = read_skill_manifest(config, tmp_path)
+    assert result is None
+
+
+def test_read_skill_manifest_returns_none_for_path_traversal(tmp_path: Path) -> None:
+    outside_manifest = tmp_path.parent / "manifest.yaml"
+    outside_manifest.write_text("api_version: 999\n")
+    config = _make_skill_config(path="../outside/skill.py")
+    result = read_skill_manifest(config, tmp_path)
+    assert result is None

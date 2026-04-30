@@ -29,6 +29,37 @@ class NimbleConfig:
     ai: AiConfig | None = None
 
 
+def read_skill_manifest(config: SkillConfig, base_path: Path) -> dict[str, Any] | None:
+    base_root = base_path.resolve()
+    skill_path = Path(config.path)
+    if skill_path.is_absolute():
+        logger.warning(
+            "Ignoring manifest for skill %s: absolute path is not allowed",
+            config.name,
+        )
+        return None
+
+    manifest_path = (base_root / skill_path.parent / "manifest.yaml").resolve()
+    try:
+        manifest_path.relative_to(base_root)
+    except ValueError:
+        logger.warning(
+            "Ignoring manifest for skill %s: path escapes repository root",
+            config.name,
+        )
+        return None
+
+    if not manifest_path.is_file():
+        return None
+    try:
+        with manifest_path.open(encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        return data if isinstance(data, dict) else None
+    except (yaml.YAMLError, OSError, UnicodeDecodeError):
+        logger.warning("Could not read manifest.yaml for skill %s", config.name)
+        return None
+
+
 def load_config(config_path: Path) -> NimbleConfig:
     try:
         with config_path.open() as f:
