@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-16"
-last_updated: "2026-05-01"  # 4-5 review complete
+last_updated: "2026-05-01"  # 4-6 done
 project: "pixi (Nimble)"
 project_key: NOKEY
 tracking_system: file-system
@@ -79,7 +79,7 @@ development_status:
   4-3-skill-lifecycle-hooks-on-load-on-error-on-unload: done
   4-4-api-version-compatibility-check: done
   4-5-yaml-config-validation-and-nimble-validate: done
-  4-6-platform-edge-case-handling-wayland-windows-reserved-hotkeys: backlog
+  4-6-platform-edge-case-handling-wayland-windows-reserved-hotkeys: done
   epic-4-retrospective: optional
 
   # Epic 5: Operational Visibility — Inspect and Manage Without Touching Files

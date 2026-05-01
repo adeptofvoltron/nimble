@@ -1,5 +1,8 @@
 import json
+import logging
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 import nimble.context.assembler as assembler
 from nimble.context.assembler import (
@@ -514,3 +517,74 @@ def test_selection_mac_restores_clipboard_after_read_raises() -> None:
     assert len(run_calls) >= 3
     assert run_calls[2][0][0] == ["pbcopy"]
     assert run_calls[2][1].get("input") == "saved"
+
+
+# ---------------------------------------------------------------------------
+# macOS one-time accessibility INFO log tests (AC: 4)
+# ---------------------------------------------------------------------------
+
+
+def test_selection_mac_logs_accessibility_info_on_first_call(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    assembler._macos_accessibility_warned = False
+    mock_controller_instance = MagicMock()
+    mock_controller_cls = MagicMock(return_value=mock_controller_instance)
+    mock_key = MagicMock()
+    mock_pynput_keyboard = MagicMock(Controller=mock_controller_cls, Key=mock_key)
+    run_responses = [_mock_run(0, ""), _mock_run(0, ""), _mock_run(0, "")]
+    with (
+        patch("nimble.context.assembler.is_mac", return_value=True),
+        patch("nimble.context.assembler.is_linux", return_value=False),
+        patch("nimble.context.assembler.is_windows", return_value=False),
+        patch("nimble.context.assembler.subprocess.run", side_effect=run_responses),
+        patch("nimble.context.assembler.time.sleep"),
+        patch.dict(
+            "sys.modules",
+            {
+                "pynput": MagicMock(keyboard=mock_pynput_keyboard),
+                "pynput.keyboard": mock_pynput_keyboard,
+            },
+        ),
+        caplog.at_level(logging.INFO, logger="nimble.context.assembler"),
+    ):
+        assembler._get_selection()
+    assert any("Accessibility not granted" in r.message for r in caplog.records)
+
+
+def test_selection_mac_logs_accessibility_info_only_once(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    assembler._macos_accessibility_warned = False
+    mock_controller_instance = MagicMock()
+    mock_controller_cls = MagicMock(return_value=mock_controller_instance)
+    mock_key = MagicMock()
+    mock_pynput_keyboard = MagicMock(Controller=mock_controller_cls, Key=mock_key)
+    run_responses = [
+        _mock_run(0, ""),
+        _mock_run(0, ""),
+        _mock_run(0, ""),
+        _mock_run(0, ""),
+        _mock_run(0, ""),
+        _mock_run(0, ""),
+    ]
+    with (
+        patch("nimble.context.assembler.is_mac", return_value=True),
+        patch("nimble.context.assembler.is_linux", return_value=False),
+        patch("nimble.context.assembler.is_windows", return_value=False),
+        patch("nimble.context.assembler.subprocess.run", side_effect=run_responses),
+        patch("nimble.context.assembler.time.sleep"),
+        patch.dict(
+            "sys.modules",
+            {
+                "pynput": MagicMock(keyboard=mock_pynput_keyboard),
+                "pynput.keyboard": mock_pynput_keyboard,
+            },
+        ),
+        caplog.at_level(logging.INFO, logger="nimble.context.assembler"),
+    ):
+        assembler._get_selection()
+        assembler._get_selection()
+    assert (
+        sum(1 for r in caplog.records if "Accessibility not granted" in r.message) == 1
+    )
