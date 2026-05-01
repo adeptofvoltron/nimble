@@ -7,7 +7,12 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from nimble.cli.commands import app
-from nimble.manifest.parser import ConfigError, NimbleConfig
+from nimble.manifest.parser import (
+    ConfigError,
+    ManifestError,
+    ManifestSpec,
+    NimbleConfig,
+)
 
 runner = CliRunner()
 
@@ -328,6 +333,136 @@ def test_disable_write_fails() -> None:
         result = runner.invoke(app, ["disable", "hello-world"])
     assert result.exit_code == 1
     assert "Failed to update" in result.output
+
+
+def _make_manifest_spec(**overrides: object) -> ManifestSpec:
+    defaults: dict[str, object] = {
+        "name": "test-skill",
+        "version": "1.0.0",
+        "api_version": 1,
+        "description": "A test skill",
+        "entrypoint": "skill.py",
+        "permissions": ["ai", "clipboard"],
+        "dependencies": [],
+        "author": "Test Author",
+        "requires": [],
+        "class_name": "TestSkill",
+    }
+    defaults.update(overrides)
+    return ManifestSpec(**defaults)  # type: ignore[arg-type]
+
+
+def test_add_displays_skill_info_and_aborts_on_no() -> None:
+    with patch(
+        "nimble.manifest.parser.fetch_remote_manifest",
+        return_value=_make_manifest_spec(),
+    ):
+        result = runner.invoke(
+            app, ["add", "ctrl+shift+d", "github.com/user/skill"], input="N\n"
+        )
+    assert result.exit_code == 0
+    assert "test-skill" in result.output
+    assert "A test skill" in result.output
+    assert "Test Author" in result.output
+    assert "cancelled" in result.output
+
+
+def test_add_displays_permissions_with_descriptions() -> None:
+    with patch(
+        "nimble.manifest.parser.fetch_remote_manifest",
+        return_value=_make_manifest_spec(permissions=["ai", "clipboard"]),
+    ):
+        result = runner.invoke(
+            app, ["add", "ctrl+shift+d", "github.com/user/skill"], input="N\n"
+        )
+    assert "ai" in result.output
+    assert "external LLM" in result.output
+    assert "clipboard" in result.output
+    assert "clipboard content" in result.output
+
+
+def test_add_unknown_permission_shows_fallback() -> None:
+    with patch(
+        "nimble.manifest.parser.fetch_remote_manifest",
+        return_value=_make_manifest_spec(permissions=["filesystem"]),
+    ):
+        result = runner.invoke(
+            app, ["add", "ctrl+shift+d", "github.com/user/skill"], input="N\n"
+        )
+    assert "filesystem" in result.output
+    assert "(unknown permission)" in result.output
+
+
+def test_add_no_permissions_shows_none_declared() -> None:
+    with patch(
+        "nimble.manifest.parser.fetch_remote_manifest",
+        return_value=_make_manifest_spec(permissions=[]),
+    ):
+        result = runner.invoke(
+            app, ["add", "ctrl+shift+d", "github.com/user/skill"], input="N\n"
+        )
+    assert "(none declared)" in result.output
+
+
+def test_add_confirms_and_proceeds() -> None:
+    with patch(
+        "nimble.manifest.parser.fetch_remote_manifest",
+        return_value=_make_manifest_spec(),
+    ):
+        result = runner.invoke(
+            app, ["add", "ctrl+shift+d", "github.com/user/skill"], input="y\n"
+        )
+    assert result.exit_code == 0
+    assert "cancelled" not in result.output
+    assert "installation is not implemented yet" in result.output
+
+
+def test_add_full_word_yes_aborts() -> None:
+    with patch(
+        "nimble.manifest.parser.fetch_remote_manifest",
+        return_value=_make_manifest_spec(),
+    ):
+        result = runner.invoke(
+            app, ["add", "ctrl+shift+d", "github.com/user/skill"], input="yes\n"
+        )
+    assert result.exit_code == 0
+    assert "cancelled" in result.output
+    assert "installation is not implemented yet" not in result.output
+
+
+def test_add_manifest_error_aborts() -> None:
+    with patch(
+        "nimble.manifest.parser.fetch_remote_manifest",
+        side_effect=ManifestError("HTTP 404"),
+    ):
+        result = runner.invoke(app, ["add", "ctrl+shift+d", "github.com/user/missing"])
+    assert result.exit_code == 1
+    assert "HTTP 404" in result.output
+
+
+def test_add_default_is_no() -> None:
+    with patch(
+        "nimble.manifest.parser.fetch_remote_manifest",
+        return_value=_make_manifest_spec(),
+    ):
+        result = runner.invoke(
+            app, ["add", "ctrl+shift+d", "github.com/user/skill"], input="\n"
+        )
+    assert "cancelled" in result.output
+    assert result.exit_code == 0
+
+
+def test_add_uppercase_Y_confirms() -> None:
+    with patch(
+        "nimble.manifest.parser.fetch_remote_manifest",
+        return_value=_make_manifest_spec(),
+    ):
+        result = runner.invoke(
+            app, ["add", "ctrl+shift+d", "github.com/user/skill"], input="Y\n"
+        )
+    assert result.exit_code == 0
+    assert "cancelled" not in result.output
+    assert "installation is not implemented yet" in result.output
 
 
 def test_terminate_windows_openprocess_failure_raises() -> None:

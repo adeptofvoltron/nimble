@@ -14,6 +14,25 @@ from nimble.platform import is_windows
 app = typer.Typer(help="Nimble — cross-platform Python hotkey daemon.")
 
 
+_PERMISSION_DESCRIPTIONS: dict[str, str] = {
+    "ai": "may send text to an external LLM API",
+    "clipboard": "reads clipboard content at hotkey-fire time",
+    "popup": "displays a system notification popup",
+    "tts": "speaks text aloud via the system TTS engine",
+    "input": "prompts the user for text input or a selection dialog",
+}
+
+
+def _prompt_install_confirm_y_only() -> bool:
+    """Return True only if the user enters exactly ``y`` or ``Y`` (AC3)."""
+    typer.echo("Install anyway? [y/N]: ", nl=False)
+    try:
+        line = sys.stdin.readline()
+    except (OSError, UnicodeDecodeError):
+        return False
+    return line.rstrip("\r\n") in ("y", "Y")
+
+
 def _running_pid_or_none(data: object) -> int | None:
     if not isinstance(data, dict):
         return None
@@ -281,6 +300,42 @@ def status() -> None:
             skill, failed_marker=True
         )
         typer.echo(f"  {name:<20} {source:<12}" f" {binding:<20} {status_display}")
+
+
+@app.command()
+def add(
+    shortcut: str = typer.Argument(
+        ..., help="Keyboard shortcut to bind (e.g. ctrl+shift+d)"
+    ),
+    repo_url: str = typer.Argument(..., help="GitHub repository URL of the skill"),
+) -> None:
+    """Install a community skill from a GitHub repository."""
+    from nimble.manifest.parser import ManifestError, fetch_remote_manifest
+
+    try:
+        spec = fetch_remote_manifest(repo_url)
+    except ManifestError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1)
+
+    typer.echo(f"Skill:       {spec.name}")
+    typer.echo(f"Description: {spec.description}")
+    typer.echo(f"Author:      {spec.author}")
+    typer.echo("")
+    typer.echo("Permissions:")
+    if spec.permissions:
+        for perm in spec.permissions:
+            desc = _PERMISSION_DESCRIPTIONS.get(perm, "(unknown permission)")
+            typer.echo(f"  - {perm:<12} ({desc})")
+    else:
+        typer.echo("  (none declared)")
+    typer.echo("")
+
+    if not _prompt_install_confirm_y_only():
+        typer.echo("Installation cancelled.")
+        raise typer.Exit(0)
+
+    typer.echo(f"Skill '{spec.name}' confirmed — installation is not implemented yet.")
 
 
 if __name__ == "__main__":
