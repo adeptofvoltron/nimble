@@ -218,7 +218,9 @@ def validate() -> None:
 
 @app.command()
 def disable(
-    skill_name: str = typer.Argument(..., help="Name of the skill to disable during current runtime"),
+    skill_name: str = typer.Argument(
+        ..., help="Name of the skill to disable during current runtime"
+    ),
 ) -> None:
     """Disable a skill without editing config.yaml manually."""
     from nimble.manifest.parser import disable_skill_in_config

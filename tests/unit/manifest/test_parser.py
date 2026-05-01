@@ -1,18 +1,24 @@
 from __future__ import annotations
 
 import tempfile
+import urllib.error
+import urllib.request
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from nimble import SUPPORTED_API_VERSION
 from nimble.manifest.parser import (
     AiConfig,
     ConfigError,
+    ManifestError,
     NimbleConfig,
     atomic_write,
     disable_skill_in_config,
+    fetch_remote_manifest,
     load_config,
+    parse_manifest_yaml,
     read_skill_manifest,
 )
 from nimble.skills.registry import SkillConfig
@@ -321,3 +327,156 @@ def test_read_skill_manifest_returns_none_for_path_traversal(tmp_path: Path) -> 
     config = _make_skill_config(path="../outside/skill.py")
     result = read_skill_manifest(config, tmp_path)
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# parse_manifest_yaml tests
+# ---------------------------------------------------------------------------
+
+_VALID_MANIFEST_YAML = """\
+name: test-skill
+version: "1.2.3"
+api_version: 1
+description: A test skill
+entrypoint: skill.py
+class_name: TestSkill
+permissions:
+  - ai
+dependencies:
+  - anthropic
+author: Test Author
+"""
+
+
+def test_parse_manifest_yaml_valid() -> None:
+    spec = parse_manifest_yaml(_VALID_MANIFEST_YAML)
+    assert spec.name == "test-skill"
+    assert spec.version == "1.2.3"
+    assert spec.api_version == 1
+    assert spec.permissions == ["ai"]
+    assert spec.dependencies == ["anthropic"]
+    assert spec.class_name == "TestSkill"
+    assert spec.requires == []
+
+
+def test_parse_manifest_yaml_missing_required_field() -> None:
+    content = _VALID_MANIFEST_YAML.replace("entrypoint: skill.py\n", "")
+    with pytest.raises(ManifestError, match="entrypoint"):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_yaml_api_version_too_high() -> None:
+    content = _VALID_MANIFEST_YAML.replace("api_version: 1", "api_version: 99")
+    with pytest.raises(ManifestError, match="upgrade your daemon"):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_yaml_api_version_equal_supported_ok() -> None:
+    replacement = f"api_version: {SUPPORTED_API_VERSION}"
+    content = _VALID_MANIFEST_YAML.replace("api_version: 1", replacement)
+    spec = parse_manifest_yaml(content)
+    assert spec.api_version == SUPPORTED_API_VERSION
+
+
+def test_parse_manifest_yaml_invalid_yaml() -> None:
+    with pytest.raises(ManifestError, match="Invalid manifest"):
+        parse_manifest_yaml("not: valid: yaml: :::")
+
+
+def test_parse_manifest_yaml_non_numeric_api_version() -> None:
+    content = _VALID_MANIFEST_YAML.replace('api_version: 1', 'api_version: "v1"')
+    with pytest.raises(ManifestError, match="api_version"):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_yaml_non_positive_api_version() -> None:
+    content = _VALID_MANIFEST_YAML.replace("api_version: 1", "api_version: 0")
+    with pytest.raises(ManifestError, match="positive integer"):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_yaml_bool_api_version_rejected() -> None:
+    content = _VALID_MANIFEST_YAML.replace("api_version: 1", "api_version: true")
+    with pytest.raises(ManifestError, match="positive integer"):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_yaml_requires_defaults_to_empty() -> None:
+    spec = parse_manifest_yaml(_VALID_MANIFEST_YAML)
+    assert spec.requires == []
+
+
+def test_parse_manifest_yaml_permissions_rejects_scalar() -> None:
+    content = _VALID_MANIFEST_YAML.replace("permissions:\n  - ai\n", "permissions: ai\n")
+    with pytest.raises(ManifestError, match="permissions"):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_yaml_dependencies_rejects_scalar() -> None:
+    content = _VALID_MANIFEST_YAML.replace(
+        "dependencies:\n  - anthropic\n", "dependencies: anthropic\n"
+    )
+    with pytest.raises(ManifestError, match="dependencies"):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_yaml_requires_rejects_scalar() -> None:
+    content = _VALID_MANIFEST_YAML + "requires: context.md\n"
+    with pytest.raises(ManifestError, match="requires"):
+        parse_manifest_yaml(content)
+
+
+# ---------------------------------------------------------------------------
+# _github_url_to_raw tests
+# ---------------------------------------------------------------------------
+
+
+def test_github_url_to_raw_https() -> None:
+    from nimble.manifest.parser import _github_url_to_raw
+
+    url = _github_url_to_raw("https://github.com/user/my-skill")
+    assert url == "https://raw.githubusercontent.com/user/my-skill/HEAD/manifest.yaml"
+
+
+def test_github_url_to_raw_without_protocol() -> None:
+    from nimble.manifest.parser import _github_url_to_raw
+
+    url = _github_url_to_raw("github.com/user/my-skill")
+    assert url == "https://raw.githubusercontent.com/user/my-skill/HEAD/manifest.yaml"
+
+
+def test_github_url_to_raw_with_git_suffix() -> None:
+    from nimble.manifest.parser import _github_url_to_raw
+
+    url = _github_url_to_raw("https://github.com/user/my-skill.git")
+    assert url == "https://raw.githubusercontent.com/user/my-skill/HEAD/manifest.yaml"
+
+
+# ---------------------------------------------------------------------------
+# fetch_remote_manifest tests
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_remote_manifest_success() -> None:
+    mock_response = MagicMock()
+    mock_response.read.return_value = _VALID_MANIFEST_YAML.encode("utf-8")
+    mock_response.__enter__ = lambda s: s
+    mock_response.__exit__ = MagicMock(return_value=False)
+    with patch("urllib.request.urlopen", return_value=mock_response):
+        spec = fetch_remote_manifest("github.com/user/test-skill")
+    assert spec.name == "test-skill"
+
+
+def test_fetch_remote_manifest_http_error() -> None:
+    err = urllib.error.HTTPError(
+        None, 404, "Not Found", {}, None  # type: ignore[arg-type]
+    )
+    with patch("urllib.request.urlopen", side_effect=err):
+        with pytest.raises(ManifestError, match="HTTP 404"):
+            fetch_remote_manifest("github.com/user/missing-skill")
+
+
+def test_fetch_remote_manifest_network_error() -> None:
+    with patch("urllib.request.urlopen", side_effect=OSError("timeout")):
+        with pytest.raises(ManifestError, match="Could not fetch"):
+            fetch_remote_manifest("github.com/user/unreachable-skill")
