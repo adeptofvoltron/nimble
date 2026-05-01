@@ -184,5 +184,52 @@ def validate() -> None:
     typer.echo("config.yaml is valid")
 
 
+@app.command(name="list")
+def list_skills() -> None:
+    """List all configured skills and their status."""
+    data = state.read_state()
+    if data is None:
+        typer.echo("Nimble daemon is not running")
+        return
+    pid = data.get("pid")
+    if pid is None or not state.is_running(int(pid)):
+        typer.echo("Nimble daemon is not running")
+        return
+    skills = data.get("skills", [])
+    if not skills:
+        typer.echo("No skills loaded")
+        return
+    for skill in skills:
+        typer.echo(
+            f"{skill['name']:<20} {skill['source']:<12}"
+            f" {skill['binding']:<20} {skill['status']}"
+        )
+
+
+@app.command()
+def status() -> None:
+    """Show daemon health and per-skill status."""
+    data = state.read_state()
+    if data is None:
+        typer.echo("Nimble daemon is not running")
+        return
+    pid = data.get("pid")
+    if pid is None or not state.is_running(int(pid)):
+        typer.echo("Nimble daemon is not running")
+        return
+    typer.echo(
+        f"Daemon: pid={data['pid']}  started={data['started_at']}"
+        f"  version={data['daemon_version']}"
+    )
+    typer.echo("")
+    typer.echo("Skills:")
+    for skill in data.get("skills", []):
+        status_display = "[FAILED]" if skill["status"] == "failed" else skill["status"]
+        typer.echo(
+            f"  {skill['name']:<20} {skill['source']:<12}"
+            f" {skill['binding']:<20} {status_display}"
+        )
+
+
 if __name__ == "__main__":
     app()

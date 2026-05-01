@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-16"
-last_updated: "2026-05-01"  # 5-1 review
+last_updated: "2026-05-01"  # 5-2 review
 project: "pixi (Nimble)"
 project_key: NOKEY
 tracking_system: file-system
@@ -85,7 +85,7 @@ development_status:
   # Epic 5: Operational Visibility — Inspect and Manage Without Touching Files
   epic-5: in-progress
   5-1-state-file-and-daemon-heartbeat: done
-  5-2-nimble-list-and-nimble-status: backlog
+  5-2-nimble-list-and-nimble-status: review
   5-3-nimble-disable: backlog
   epic-5-retrospective: optional
 
