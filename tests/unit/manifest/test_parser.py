@@ -359,6 +359,24 @@ def test_parse_manifest_yaml_valid() -> None:
     assert spec.requires == []
 
 
+def test_parse_manifest_yaml_name_rejects_path_with_slash() -> None:
+    content = _VALID_MANIFEST_YAML.replace("name: test-skill", "name: evil/nested")
+    with pytest.raises(ManifestError, match="single path segment"):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_yaml_name_rejects_dotdot() -> None:
+    content = _VALID_MANIFEST_YAML.replace("name: test-skill", "name: ..")
+    with pytest.raises(ManifestError, match="must not be"):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_yaml_name_rejects_leading_trailing_space() -> None:
+    content = _VALID_MANIFEST_YAML.replace("name: test-skill", "name: ' bad '")
+    with pytest.raises(ManifestError, match="leading or trailing whitespace"):
+        parse_manifest_yaml(content)
+
+
 def test_parse_manifest_yaml_missing_required_field() -> None:
     content = _VALID_MANIFEST_YAML.replace("entrypoint: skill.py\n", "")
     with pytest.raises(ManifestError, match="entrypoint"):

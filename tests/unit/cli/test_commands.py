@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from nimble.cli.commands import app
+from nimble.manifest.installer import InstallError
 from nimble.manifest.parser import (
     ConfigError,
     ManifestError,
@@ -405,29 +406,38 @@ def test_add_no_permissions_shows_none_declared() -> None:
 
 
 def test_add_confirms_and_proceeds() -> None:
-    with patch(
-        "nimble.manifest.parser.fetch_remote_manifest",
-        return_value=_make_manifest_spec(),
+    spec = _make_manifest_spec()
+    fake_root = Path("/tmp/nimble-fake-root")
+    with (
+        patch(
+            "nimble.manifest.parser.fetch_remote_manifest",
+            return_value=spec,
+        ),
+        patch("nimble.cli.commands._repo_root", return_value=fake_root),
+        patch("nimble.manifest.installer.install_skill_venv") as mock_install,
     ):
         result = runner.invoke(
             app, ["add", "ctrl+shift+d", "github.com/user/skill"], input="y\n"
         )
     assert result.exit_code == 0
     assert "cancelled" not in result.output
-    assert "installation is not implemented yet" in result.output
+    mock_install.assert_called_once_with(spec, fake_root)
 
 
 def test_add_full_word_yes_aborts() -> None:
-    with patch(
-        "nimble.manifest.parser.fetch_remote_manifest",
-        return_value=_make_manifest_spec(),
+    with (
+        patch(
+            "nimble.manifest.parser.fetch_remote_manifest",
+            return_value=_make_manifest_spec(),
+        ),
+        patch("nimble.manifest.installer.install_skill_venv") as mock_install,
     ):
         result = runner.invoke(
             app, ["add", "ctrl+shift+d", "github.com/user/skill"], input="yes\n"
         )
     assert result.exit_code == 0
     assert "cancelled" in result.output
-    assert "installation is not implemented yet" not in result.output
+    mock_install.assert_not_called()
 
 
 def test_add_manifest_error_aborts() -> None:
@@ -453,16 +463,40 @@ def test_add_default_is_no() -> None:
 
 
 def test_add_uppercase_Y_confirms() -> None:
-    with patch(
-        "nimble.manifest.parser.fetch_remote_manifest",
-        return_value=_make_manifest_spec(),
+    spec = _make_manifest_spec()
+    fake_root = Path("/tmp/nimble-fake-root")
+    with (
+        patch(
+            "nimble.manifest.parser.fetch_remote_manifest",
+            return_value=spec,
+        ),
+        patch("nimble.cli.commands._repo_root", return_value=fake_root),
+        patch("nimble.manifest.installer.install_skill_venv") as mock_install,
     ):
         result = runner.invoke(
             app, ["add", "ctrl+shift+d", "github.com/user/skill"], input="Y\n"
         )
     assert result.exit_code == 0
     assert "cancelled" not in result.output
-    assert "installation is not implemented yet" in result.output
+    mock_install.assert_called_once_with(spec, fake_root)
+
+
+def test_add_install_error_exits_with_code_1() -> None:
+    with (
+        patch(
+            "nimble.manifest.parser.fetch_remote_manifest",
+            return_value=_make_manifest_spec(),
+        ),
+        patch(
+            "nimble.manifest.installer.install_skill_venv",
+            side_effect=InstallError("pip failed"),
+        ),
+    ):
+        result = runner.invoke(
+            app, ["add", "ctrl+shift+d", "github.com/user/skill"], input="y\n"
+        )
+    assert result.exit_code == 1
+    assert "pip failed" in result.output
 
 
 def test_terminate_windows_openprocess_failure_raises() -> None:

@@ -335,7 +335,16 @@ def add(
         typer.echo("Installation cancelled.")
         raise typer.Exit(0)
 
-    typer.echo(f"Skill '{spec.name}' confirmed — installation is not implemented yet.")
+    from nimble.manifest.installer import InstallError, install_skill_venv
+
+    typer.echo(f"Installing '{spec.name}'...")
+    try:
+        install_skill_venv(spec, _repo_root())
+    except InstallError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1)
+
+    typer.echo(f"Dependencies installed for '{spec.name}'.")
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ import tempfile
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
@@ -36,6 +36,41 @@ class ManifestSpec:
     author: str
     requires: list[str] = field(default_factory=list)
     class_name: str = ""
+
+
+def _validate_manifest_skill_name(raw: object, source: str) -> str:
+    """Ensure skill name is safe for use as a single filesystem directory segment."""
+    name = str(raw)
+    if not name:
+        raise ManifestError(
+            f"manifest.yaml from {source} field 'name' must be a non-empty string"
+        )
+    if name.strip() != name:
+        raise ManifestError(
+            f"manifest.yaml from {source} field 'name'"
+            " must not have leading or trailing whitespace"
+        )
+    if "\x00" in name:
+        raise ManifestError(
+            f"manifest.yaml from {source} field 'name' contains invalid characters"
+        )
+    if "/" in name or "\\" in name:
+        raise ManifestError(
+            f"manifest.yaml from {source} field 'name'"
+            f" must be a single path segment (got {name!r})"
+        )
+    parts = PurePosixPath(name).parts
+    if len(parts) != 1:
+        raise ManifestError(
+            f"manifest.yaml from {source} field 'name'"
+            f" must be a single path segment (got {name!r})"
+        )
+    segment = parts[0]
+    if segment in (".", ".."):
+        raise ManifestError(
+            f"manifest.yaml from {source} field 'name' must not be {segment!r}"
+        )
+    return name
 
 
 def _parse_manifest_string_list(
@@ -255,8 +290,10 @@ def parse_manifest_yaml(content: str, source: str = "<string>") -> ManifestSpec:
             f"Skill requires Nimble api_version {api_version} — upgrade your daemon"
         )
 
+    skill_name = _validate_manifest_skill_name(data["name"], source)
+
     return ManifestSpec(
-        name=str(data["name"]),
+        name=skill_name,
         version=str(data["version"]),
         api_version=api_version,
         description=str(data["description"]),
