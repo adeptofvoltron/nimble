@@ -275,7 +275,7 @@ def _github_url_to_raw(repo_url: str) -> str:
         url = url[:-4]
     for prefix in ("https://github.com/", "http://github.com/", "github.com/"):
         if url.startswith(prefix):
-            url = url[len(prefix) :]
+            url = url[len(prefix):]
             break
     parts = url.split("/")
     if len(parts) < 2 or not parts[0] or not parts[1]:
