@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import datetime
 import logging
 import os
 import signal
 import sys
 import threading
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from nimble import __version__
 from nimble.context.assembler import build_context
 from nimble.hotkeys import get_adapter
 from nimble.logging_setup import LOG_PATH, configure_logging
@@ -17,10 +20,32 @@ from nimble.notifier import Notifier
 from nimble.skills.loader import validate_skill_paths
 from nimble.skills.registry import SkillConfig, SkillRegistry
 from nimble.skills.runner import SkillRunner
-from nimble.state import remove_pid, write_pid
+from nimble.state import SkillState, remove_pid, remove_state, write_pid, write_state
 from nimble.watcher import ConfigWatcher
 
 logger = logging.getLogger(__name__)
+
+
+def _build_skill_states(registry: SkillRegistry) -> list[SkillState]:
+    return [
+        SkillState(
+            name=w.config.name,
+            source=w.config.source,
+            binding=w.config.binding,
+            status=w.status,
+            worker_pid=w.process.pid if w.process.poll() is None else None,
+        )
+        for w in registry.all()
+    ]
+
+
+def _state_signature(
+    skills: list[SkillState],
+) -> tuple[tuple[str, str, str, str, int | None], ...]:
+    return tuple(
+        (s.name, s.source, s.binding, s.status, s.worker_pid)
+        for s in sorted(skills, key=lambda item: item.name)
+    )
 
 
 def run(repo_root: Path, debug: bool = False) -> None:
@@ -65,6 +90,31 @@ def run(repo_root: Path, debug: bool = False) -> None:
         sys.exit(1)
     write_pid(os.getpid())
     started = True
+    pid = os.getpid()
+    started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    initial_skills = _build_skill_states(registry)
+    write_state(pid, started_at, __version__, initial_skills)
+    last_signature = _state_signature(initial_skills)
+
+    def _heartbeat() -> None:
+        nonlocal last_signature
+        next_heartbeat_at = time.monotonic() + 5.0
+        while not stop_event.wait(0.5):
+            try:
+                runner.check_for_dead_workers()
+                skills = _build_skill_states(registry)
+                current_signature = _state_signature(skills)
+                now = time.monotonic()
+                should_force_heartbeat = now >= next_heartbeat_at
+                if current_signature != last_signature or should_force_heartbeat:
+                    write_state(pid, started_at, __version__, skills)
+                    last_signature = current_signature
+                    next_heartbeat_at = now + 5.0
+            except Exception:
+                logger.exception("Heartbeat update failed; continuing")
+
+    heartbeat_thread = threading.Thread(target=_heartbeat, daemon=True)
+    heartbeat_thread.start()
 
     if hasattr(adapter, "reserved_hotkeys_found"):
         for key in adapter.reserved_hotkeys_found:
@@ -132,6 +182,8 @@ def run(repo_root: Path, debug: bool = False) -> None:
             len(to_remove),
             len(unchanged),
         )
+        skills = _build_skill_states(registry)
+        write_state(pid, started_at, __version__, skills)
 
     watcher = ConfigWatcher(config_path, _reload_config)
     watcher.start()
@@ -145,6 +197,7 @@ def run(repo_root: Path, debug: bool = False) -> None:
             runner.shutdown()
             adapter.stop()
             remove_pid()
+            remove_state()
             logger.info("Nimble daemon stopped")
 
 
