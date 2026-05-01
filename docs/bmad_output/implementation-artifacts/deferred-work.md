@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: code review of 5-3-nimble-disable.md (2026-05-01)
+
+- `nimble/manifest/parser.py:50`: `disable_skill_in_config` disables only the first matching skill name; duplicate skill names are a pre-existing config integrity gap and make disable semantics ambiguous until uniqueness is enforced.
+
 ## Deferred from: code review of 4-2-persistent-log-file.md (2026-04-30)
 
 - `worker/entrypoint.py:15-22`: Worker `FileHandler` opens without a `mkdir` guard — daemon always creates `~/.nimble/` first so this is safe in practice; add mkdir if worker ever runs standalone.

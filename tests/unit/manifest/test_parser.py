@@ -11,6 +11,7 @@ from nimble.manifest.parser import (
     ConfigError,
     NimbleConfig,
     atomic_write,
+    disable_skill_in_config,
     load_config,
     read_skill_manifest,
 )
@@ -239,6 +240,79 @@ def test_atomic_write_uses_same_directory_for_tmp(tmp_path: Path) -> None:
         atomic_write(target, "content")
 
     assert captured_dir == tmp_path
+
+
+def test_disable_skill_sets_disabled_flag(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        "skills:\n"
+        "  - name: hello-world\n"
+        "    source: local\n"
+        "    path: skills/hello_world/skill.py\n"
+        "    class_name: HelloWorldSkill\n"
+        "    binding: ctrl+shift+h\n"
+    )
+    disable_skill_in_config(cfg, "hello-world")
+    import yaml
+
+    data = yaml.safe_load(cfg.read_text())
+    assert data["skills"][0].get("disabled") is True
+
+
+def test_disable_skill_not_found_raises(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        "skills:\n"
+        "  - name: foo\n"
+        "    source: local\n"
+        "    path: p\n"
+        "    class_name: C\n"
+        "    binding: b\n"
+    )
+    original = cfg.read_text()
+    with pytest.raises(ValueError, match="No skill named 'bar'"):
+        disable_skill_in_config(cfg, "bar")
+    assert cfg.read_text() == original
+
+
+def test_disable_skill_preserves_other_fields(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        "skills:\n"
+        "  - name: hello-world\n"
+        "    source: local\n"
+        "    path: skills/hello_world/skill.py\n"
+        "    class_name: HelloWorldSkill\n"
+        "    binding: ctrl+shift+h\n"
+    )
+    disable_skill_in_config(cfg, "hello-world")
+    import yaml
+
+    skill = yaml.safe_load(cfg.read_text())["skills"][0]
+    assert skill["name"] == "hello-world"
+    assert skill["binding"] == "ctrl+shift+h"
+    assert skill["path"] == "skills/hello_world/skill.py"
+
+
+def test_parse_skills_skips_disabled_entries(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        "skills:\n"
+        "  - name: active-skill\n"
+        "    source: local\n"
+        "    path: skills/active/skill.py\n"
+        "    class_name: ActiveSkill\n"
+        "    binding: ctrl+shift+a\n"
+        "  - name: disabled-skill\n"
+        "    source: local\n"
+        "    path: skills/disabled/skill.py\n"
+        "    class_name: DisabledSkill\n"
+        "    binding: ctrl+shift+d\n"
+        "    disabled: true\n"
+    )
+    result = load_config(cfg)
+    assert len(result.skills) == 1
+    assert result.skills[0].name == "active-skill"
 
 
 def test_read_skill_manifest_returns_none_for_path_traversal(tmp_path: Path) -> None:

@@ -11,6 +11,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from nimble import __version__
 from nimble.context.assembler import build_context
 from nimble.hotkeys import get_adapter
@@ -145,8 +147,19 @@ def run(repo_root: Path, debug: bool = False) -> None:
             logger.error("Config reload error (keeping current state): %s", exc)
             return
 
+        try:
+            with cfg_path.open() as f:
+                raw_yaml = yaml.safe_load(f) or {}
+            disabled_names: set[str] = {
+                str(s["name"])
+                for s in raw_yaml.get("skills", [])
+                if isinstance(s, dict) and s.get("disabled") and s.get("name")
+            }
+        except Exception:
+            disabled_names = set()
+
         current: dict[str, SkillConfig] = {
-            w.config.name: w.config for w in registry.all() if w.status != "failed"
+            w.config.name: w.config for w in registry.all() if w.status == "loaded"
         }
         incoming: dict[str, SkillConfig] = {s.name: s for s in new_validated}
 
@@ -168,6 +181,8 @@ def run(repo_root: Path, debug: bool = False) -> None:
 
         for name in to_remove:
             _shutdown_worker(name)
+            if name in disabled_names:
+                registry.mark_disabled(name)
 
         runner.spawn_workers(to_add)
 

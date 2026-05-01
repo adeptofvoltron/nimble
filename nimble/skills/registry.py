@@ -50,3 +50,8 @@ class SkillRegistry:
                 name,
                 worker.process.poll(),
             )
+
+    def mark_disabled(self, name: str) -> None:
+        worker = self._workers.get(name)
+        if worker is not None:
+            worker.status = "disabled"

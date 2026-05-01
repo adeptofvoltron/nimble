@@ -47,6 +47,30 @@ def atomic_write(path: Path, content: str) -> None:
         raise
 
 
+def disable_skill_in_config(config_path: Path, skill_name: str) -> None:
+    try:
+        with config_path.open() as f:
+            raw = yaml.safe_load(f)
+    except (OSError, yaml.YAMLError) as exc:
+        raise OSError(f"Failed to read config.yaml: {exc}") from exc
+
+    if raw is None:
+        raw = {}
+
+    skills = raw.get("skills", [])
+    if not isinstance(skills, list):
+        raise OSError("config.yaml 'skills' is not a list")
+
+    for entry in skills:
+        if isinstance(entry, dict) and entry.get("name") == skill_name:
+            entry["disabled"] = True
+            content = yaml.dump(raw, default_flow_style=False, allow_unicode=True)
+            atomic_write(config_path, content)
+            return
+
+    raise ValueError(f"No skill named '{skill_name}' found in config.yaml")
+
+
 def read_skill_manifest(config: SkillConfig, base_path: Path) -> dict[str, Any] | None:
     base_root = base_path.resolve()
     skill_path = Path(config.path)
@@ -122,6 +146,9 @@ def _parse_skills(raw: Any) -> list[SkillConfig]:
     for i, entry in enumerate(raw):
         if not isinstance(entry, dict):
             raise ConfigError(f"Skill entry at index {i} must be a mapping")
+
+        if entry.get("disabled"):
+            continue
 
         missing = required_fields - entry.keys()
         if missing:

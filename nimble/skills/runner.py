@@ -363,7 +363,7 @@ class SkillRunner:
 
     def check_for_dead_workers(self) -> None:
         for worker in self._registry.all():
-            if worker.status == "failed":
+            if worker.status in {"failed", "disabled"}:
                 continue
             if worker.process.poll() is not None:
                 self._disable_dead_worker(worker)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -7,6 +8,7 @@ import pytest
 
 import nimble.daemon as daemon_module
 from nimble.state import SkillState
+from nimble.skills.registry import SkillConfig, SkillRegistry, SkillWorker
 from nimble.skills.runner import DispatchResult, SkillError
 
 from tests.conftest import FakeNotifier
@@ -315,3 +317,95 @@ def test_run_sends_notification_for_each_reserved_hotkey(tmp_path: Path) -> None
             run(tmp_path)
     warning_sends = [s for s in fake_notifier.sent if "startup warning" in s[0]]
     assert len(warning_sends) == 2
+
+
+def test_reload_reenables_previously_disabled_skill(tmp_path: Path) -> None:
+    registry = SkillRegistry()
+    skill_cfg = SkillConfig(
+        name="hello-world",
+        source="local",
+        binding="ctrl+shift+h",
+        path="skills/hello.py",
+        class_name="HelloSkill",
+    )
+
+    class _FakeRunner:
+        def __init__(
+            self,
+            registry: SkillRegistry,
+            notifier: object,
+            repo_root: Path,
+            ai_config: object = None,
+            debug: bool = False,
+        ) -> None:
+            self._registry = registry
+
+        def spawn_workers(self, configs: list[SkillConfig]) -> None:
+            for cfg in configs:
+                proc = MagicMock()
+                proc.poll.return_value = None
+                self._registry.register(
+                    SkillWorker(
+                        config=cfg,
+                        process=proc,
+                        status="loaded",
+                        python_executable="python",
+                    )
+                )
+
+        def check_for_dead_workers(self) -> None:
+            return
+
+        def shutdown(self) -> None:
+            return
+
+    class _FakeWatcher:
+        def __init__(self, config_path: Path, callback: Callable[[Path], None]) -> None:
+            self._config_path = config_path
+            self._callback = callback
+
+        def start(self) -> None:
+            self._callback(self._config_path)
+            self._callback(self._config_path)
+
+        def stop(self) -> None:
+            return
+
+    mock_adapter = MagicMock()
+    mock_event = MagicMock()
+    mock_event.wait.return_value = True
+
+    with (
+        patch("nimble.daemon.SkillRegistry", return_value=registry),
+        patch("nimble.daemon.SkillRunner", _FakeRunner),
+        patch("nimble.daemon.ConfigWatcher", _FakeWatcher),
+        patch("nimble.daemon.configure_logging"),
+        patch("nimble.daemon.get_adapter", return_value=mock_adapter),
+        patch("nimble.daemon.Notifier"),
+        patch(
+            "nimble.daemon.load_config",
+            return_value=MagicMock(skills=[skill_cfg], ai=None),
+        ),
+        patch(
+            "nimble.daemon.validate_skill_paths",
+            side_effect=[[skill_cfg], [], [skill_cfg]],
+        ),
+        patch(
+            "nimble.daemon.yaml.safe_load",
+            side_effect=[
+                {"skills": [{"name": "hello-world", "disabled": True}]},
+                {"skills": [{"name": "hello-world"}]},
+            ],
+        ),
+        patch("nimble.daemon.write_pid"),
+        patch("nimble.daemon.remove_pid"),
+        patch("nimble.daemon.write_state"),
+        patch("nimble.daemon.remove_state"),
+        patch("nimble.daemon.threading.Event", return_value=mock_event),
+        patch("nimble.daemon.threading.Thread"),
+    ):
+        daemon_module.run(tmp_path)
+
+    worker = registry.get("hello-world")
+    assert worker is not None
+    assert worker.status == "loaded"
