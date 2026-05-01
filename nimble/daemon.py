@@ -57,9 +57,22 @@ def run(repo_root: Path, debug: bool = False) -> None:
     signal.signal(signal.SIGTERM, _signal_handler)
     signal.signal(signal.SIGINT, _signal_handler)
 
-    adapter.start()
+    try:
+        adapter.start()
+    except RuntimeError as exc:
+        notifier.send("Nimble — startup error", str(exc))
+        print(str(exc))
+        sys.exit(1)
     write_pid(os.getpid())
     started = True
+
+    if hasattr(adapter, "reserved_hotkeys_found"):
+        for key in adapter.reserved_hotkeys_found:
+            notifier.send(
+                "Nimble — startup warning",
+                f"Binding {key!r} is a Windows-reserved hotkey"
+                " and may not fire reliably (FR5)",
+            )
 
     notifier.send("Nimble", "Nimble daemon running.")  # FR41
 

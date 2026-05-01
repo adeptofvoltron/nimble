@@ -113,3 +113,41 @@ def test_stop_twice_after_start_is_noop() -> None:
     adapter.stop()  # second stop must be a no-op
     mock_listener.stop.assert_called_once()
     mock_listener.join.assert_called_once()
+
+
+def test_start_populates_reserved_hotkeys_found() -> None:
+    adapter = WindowsHotkeyAdapter()
+    adapter.register("win+l", lambda: None)
+    mock_listener = MagicMock()
+    mock_keyboard = MagicMock()
+    mock_keyboard.GlobalHotKeys = MagicMock(return_value=mock_listener)
+    with patch("nimble.hotkeys.windows._pynput_keyboard", return_value=mock_keyboard):
+        adapter.start()
+    assert adapter.reserved_hotkeys_found == ["<win>+l"]
+
+
+def test_start_reserved_hotkeys_found_empty_for_normal_shortcut() -> None:
+    adapter = WindowsHotkeyAdapter()
+    adapter.register("ctrl+shift+d", lambda: None)
+    mock_listener = MagicMock()
+    mock_keyboard = MagicMock()
+    mock_keyboard.GlobalHotKeys = MagicMock(return_value=mock_listener)
+    with patch("nimble.hotkeys.windows._pynput_keyboard", return_value=mock_keyboard):
+        adapter.start()
+    assert adapter.reserved_hotkeys_found == []
+
+
+def test_start_after_stop_rebuilds_reserved_hotkeys_found_without_duplicates() -> None:
+    adapter = WindowsHotkeyAdapter()
+    adapter.register("win+l", lambda: None)
+    first_listener = MagicMock()
+    second_listener = MagicMock()
+    mock_keyboard = MagicMock()
+    mock_keyboard.GlobalHotKeys = MagicMock(
+        side_effect=[first_listener, second_listener]
+    )
+    with patch("nimble.hotkeys.windows._pynput_keyboard", return_value=mock_keyboard):
+        adapter.start()
+        adapter.stop()
+        adapter.start()
+    assert adapter.reserved_hotkeys_found == ["<win>+l"]

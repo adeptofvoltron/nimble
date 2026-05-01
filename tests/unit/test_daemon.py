@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 import nimble.daemon as daemon_module
 from nimble.skills.runner import DispatchResult, SkillError
 
@@ -136,3 +138,69 @@ def test_startup_notification_title_and_body(tmp_path: Path) -> None:
         daemon_module.run(tmp_path)
 
     assert fake_notifier.sent[0] == ("Nimble", "Nimble daemon running.")
+
+
+def test_run_exits_on_adapter_start_runtime_error(tmp_path: Path) -> None:
+    fake_notifier = FakeNotifier()
+    mock_adapter = MagicMock()
+    mock_adapter.start.side_effect = RuntimeError("XWayland not found")
+    with (
+        patch("nimble.daemon.load_config", return_value=MagicMock(skills=[], ai=None)),
+        patch("nimble.daemon.validate_skill_paths", return_value=[]),
+        patch("nimble.daemon.get_adapter", return_value=mock_adapter),
+        patch("nimble.daemon.Notifier", return_value=fake_notifier),
+        patch("nimble.daemon.configure_logging"),
+        patch("nimble.daemon.SkillRunner"),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        from nimble.daemon import run
+
+        run(tmp_path)
+    assert exc_info.value.code == 1
+
+
+def test_run_sends_notification_on_adapter_start_runtime_error(tmp_path: Path) -> None:
+    fake_notifier = FakeNotifier()
+    mock_adapter = MagicMock()
+    mock_adapter.start.side_effect = RuntimeError("XWayland not found")
+    with (
+        patch("nimble.daemon.load_config", return_value=MagicMock(skills=[], ai=None)),
+        patch("nimble.daemon.validate_skill_paths", return_value=[]),
+        patch("nimble.daemon.get_adapter", return_value=mock_adapter),
+        patch("nimble.daemon.Notifier", return_value=fake_notifier),
+        patch("nimble.daemon.configure_logging"),
+        patch("nimble.daemon.SkillRunner"),
+        pytest.raises(SystemExit),
+    ):
+        from nimble.daemon import run
+
+        run(tmp_path)
+    assert len(fake_notifier.sent) == 1
+    _, body = fake_notifier.sent[0]
+    assert "XWayland not found" in body
+
+
+def test_run_sends_notification_for_each_reserved_hotkey(tmp_path: Path) -> None:
+    fake_notifier = FakeNotifier()
+    mock_adapter = MagicMock(
+        spec=["start", "stop", "register", "reserved_hotkeys_found"]
+    )
+    mock_adapter.reserved_hotkeys_found = ["<win>+l", "<win>+d"]
+    with (
+        patch("nimble.daemon.load_config", return_value=MagicMock(skills=[], ai=None)),
+        patch("nimble.daemon.validate_skill_paths", return_value=[]),
+        patch("nimble.daemon.get_adapter", return_value=mock_adapter),
+        patch("nimble.daemon.Notifier", return_value=fake_notifier),
+        patch("nimble.daemon.configure_logging"),
+        patch("nimble.daemon.SkillRunner"),
+        patch("nimble.daemon.write_pid"),
+        patch("nimble.daemon.ConfigWatcher"),
+        patch("nimble.daemon.threading.Event") as mock_event,
+    ):
+        mock_event.return_value.wait.side_effect = KeyboardInterrupt
+        with pytest.raises((KeyboardInterrupt, SystemExit)):
+            from nimble.daemon import run
+
+            run(tmp_path)
+    warning_sends = [s for s in fake_notifier.sent if "startup warning" in s[0]]
+    assert len(warning_sends) == 2

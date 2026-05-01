@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import logging
 import subprocess
 import time
 from typing import Any
 
 from nimble.platform import is_linux, is_mac, is_windows
+
+logger = logging.getLogger(__name__)
+
+_macos_accessibility_warned = False
 
 
 def _get_selection() -> str:
@@ -68,6 +73,16 @@ def _get_selection() -> str:
         except Exception:
             return ""
     if is_mac():
+        global _macos_accessibility_warned
+        if not _macos_accessibility_warned:
+            logger.info(
+                "macOS: Accessibility not granted —"
+                " selection uses clipboard simulation."
+                " Grant access in System Settings"
+                " → Privacy & Security → Accessibility"
+                " for more reliable capture."
+            )
+            _macos_accessibility_warned = True
         try:
             from pynput.keyboard import Controller, Key
 
