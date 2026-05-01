@@ -108,8 +108,11 @@ def test_startup_notification_fires(tmp_path: Path) -> None:
         patch("nimble.daemon.ConfigWatcher"),
         patch("nimble.daemon.write_pid"),
         patch("nimble.daemon.remove_pid"),
+        patch("nimble.daemon.write_state"),
+        patch("nimble.daemon.remove_state"),
         patch("nimble.daemon.Notifier", return_value=fake_notifier),
         patch("threading.Event", return_value=mock_stop_event),
+        patch("nimble.daemon.threading.Thread"),
     ):
         mock_load_config.return_value.skills = []
         daemon_module.run(tmp_path)
@@ -131,8 +134,11 @@ def test_startup_notification_title_and_body(tmp_path: Path) -> None:
         patch("nimble.daemon.ConfigWatcher"),
         patch("nimble.daemon.write_pid"),
         patch("nimble.daemon.remove_pid"),
+        patch("nimble.daemon.write_state"),
+        patch("nimble.daemon.remove_state"),
         patch("nimble.daemon.Notifier", return_value=fake_notifier),
         patch("threading.Event", return_value=mock_stop_event),
+        patch("nimble.daemon.threading.Thread"),
     ):
         mock_load_config.return_value.skills = []
         daemon_module.run(tmp_path)
@@ -180,6 +186,50 @@ def test_run_sends_notification_on_adapter_start_runtime_error(tmp_path: Path) -
     assert "XWayland not found" in body
 
 
+def test_run_writes_state_on_startup(tmp_path: Path) -> None:
+    with (
+        patch("nimble.daemon.load_config", return_value=MagicMock(skills=[], ai=None)),
+        patch("nimble.daemon.validate_skill_paths", return_value=[]),
+        patch("nimble.daemon.get_adapter"),
+        patch("nimble.daemon.Notifier"),
+        patch("nimble.daemon.configure_logging"),
+        patch("nimble.daemon.SkillRunner"),
+        patch("nimble.daemon.write_pid"),
+        patch("nimble.daemon.ConfigWatcher"),
+        patch("nimble.daemon.write_state") as mock_write_state,
+        patch("nimble.daemon.remove_state"),
+        patch("nimble.daemon.remove_pid"),
+        patch("nimble.daemon.threading.Event") as mock_event_cls,
+        patch("nimble.daemon.threading.Thread"),
+    ):
+        mock_event_cls.return_value.wait.side_effect = KeyboardInterrupt
+        with pytest.raises((KeyboardInterrupt, SystemExit)):
+            daemon_module.run(tmp_path)
+    assert mock_write_state.called
+
+
+def test_run_removes_state_on_shutdown(tmp_path: Path) -> None:
+    with (
+        patch("nimble.daemon.load_config", return_value=MagicMock(skills=[], ai=None)),
+        patch("nimble.daemon.validate_skill_paths", return_value=[]),
+        patch("nimble.daemon.get_adapter"),
+        patch("nimble.daemon.Notifier"),
+        patch("nimble.daemon.configure_logging"),
+        patch("nimble.daemon.SkillRunner"),
+        patch("nimble.daemon.write_pid"),
+        patch("nimble.daemon.ConfigWatcher"),
+        patch("nimble.daemon.write_state"),
+        patch("nimble.daemon.remove_state") as mock_remove_state,
+        patch("nimble.daemon.remove_pid"),
+        patch("nimble.daemon.threading.Event") as mock_event_cls,
+        patch("nimble.daemon.threading.Thread"),
+    ):
+        mock_event_cls.return_value.wait.side_effect = KeyboardInterrupt
+        with pytest.raises((KeyboardInterrupt, SystemExit)):
+            daemon_module.run(tmp_path)
+    assert mock_remove_state.called
+
+
 def test_run_sends_notification_for_each_reserved_hotkey(tmp_path: Path) -> None:
     fake_notifier = FakeNotifier()
     mock_adapter = MagicMock(
@@ -195,7 +245,11 @@ def test_run_sends_notification_for_each_reserved_hotkey(tmp_path: Path) -> None
         patch("nimble.daemon.SkillRunner"),
         patch("nimble.daemon.write_pid"),
         patch("nimble.daemon.ConfigWatcher"),
+        patch("nimble.daemon.write_state"),
+        patch("nimble.daemon.remove_state"),
+        patch("nimble.daemon.remove_pid"),
         patch("nimble.daemon.threading.Event") as mock_event,
+        patch("nimble.daemon.threading.Thread"),
     ):
         mock_event.return_value.wait.side_effect = KeyboardInterrupt
         with pytest.raises((KeyboardInterrupt, SystemExit)):

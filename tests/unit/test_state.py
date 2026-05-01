@@ -1,10 +1,21 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 import nimble.state as state_module
-from nimble.state import is_running, read_pid, remove_pid, write_pid
+from nimble.state import (
+    SkillState,
+    is_running,
+    read_pid,
+    remove_pid,
+    remove_state,
+    write_pid,
+    write_state,
+)
 
 
 def test_write_and_read_pid(tmp_path: Path) -> None:
@@ -46,3 +57,99 @@ def test_is_running_process_exists() -> None:
 def test_is_running_process_dead() -> None:
     with patch("os.kill", side_effect=ProcessLookupError):
         assert is_running(99999) is False
+
+
+def test_write_state_creates_valid_json(tmp_path: Path) -> None:
+    skills = [
+        SkillState(
+            name="hello-world",
+            source="local",
+            binding="ctrl+shift+h",
+            status="loaded",
+            worker_pid=9999,
+        )
+    ]
+    with (
+        patch.object(state_module, "NIMBLE_DIR", tmp_path),
+        patch.object(state_module, "STATE_FILE", tmp_path / "state.json"),
+    ):
+        write_state(12345, "2026-05-01T10:00:00+00:00", "1.0.0", skills)
+        data = json.loads((tmp_path / "state.json").read_text())
+
+    assert data["pid"] == 12345
+    assert data["started_at"] == "2026-05-01T10:00:00+00:00"
+    assert data["daemon_version"] == "1.0.0"
+    assert len(data["skills"]) == 1
+    assert data["skills"][0]["name"] == "hello-world"
+    assert data["skills"][0]["worker_pid"] == 9999
+
+
+def test_write_state_skill_entry_fields(tmp_path: Path) -> None:
+    skills = [
+        SkillState(
+            name="log-diagnosis",
+            source="local",
+            binding="ctrl+shift+d",
+            status="loaded",
+            worker_pid=12346,
+        )
+    ]
+    with (
+        patch.object(state_module, "NIMBLE_DIR", tmp_path),
+        patch.object(state_module, "STATE_FILE", tmp_path / "state.json"),
+    ):
+        write_state(1, "2026-05-01T00:00:00+00:00", "1.0.0", skills)
+        data = json.loads((tmp_path / "state.json").read_text())
+
+    entry = data["skills"][0]
+    assert entry["name"] == "log-diagnosis"
+    assert entry["source"] == "local"
+    assert entry["binding"] == "ctrl+shift+d"
+    assert entry["status"] == "loaded"
+    assert entry["worker_pid"] == 12346
+
+
+def test_write_state_worker_pid_none_for_dead_worker(tmp_path: Path) -> None:
+    skills = [
+        SkillState(
+            name="s", source="local", binding="ctrl+a", status="failed", worker_pid=None
+        )
+    ]
+    with (
+        patch.object(state_module, "NIMBLE_DIR", tmp_path),
+        patch.object(state_module, "STATE_FILE", tmp_path / "state.json"),
+    ):
+        write_state(1, "2026-05-01T00:00:00+00:00", "1.0.0", skills)
+        data = json.loads((tmp_path / "state.json").read_text())
+
+    assert data["skills"][0]["worker_pid"] is None
+
+
+def test_write_state_is_atomic(tmp_path: Path) -> None:
+    state_file = tmp_path / "state.json"
+    with (
+        patch.object(state_module, "NIMBLE_DIR", tmp_path),
+        patch.object(state_module, "STATE_FILE", state_file),
+        patch("pathlib.Path.rename", side_effect=OSError("disk full")),
+        pytest.raises(OSError),
+    ):
+        write_state(1, "2026-05-01T00:00:00+00:00", "1.0.0", [])
+    assert not state_file.exists()
+
+
+def test_remove_state_deletes_file(tmp_path: Path) -> None:
+    state_file = tmp_path / "state.json"
+    with (
+        patch.object(state_module, "NIMBLE_DIR", tmp_path),
+        patch.object(state_module, "STATE_FILE", state_file),
+    ):
+        write_state(1, "2026-05-01T00:00:00+00:00", "1.0.0", [])
+        assert state_file.exists()
+        remove_state()
+
+    assert not state_file.exists()
+
+
+def test_remove_state_noop_if_absent(tmp_path: Path) -> None:
+    with patch.object(state_module, "STATE_FILE", tmp_path / "state.json"):
+        remove_state()  # should not raise
