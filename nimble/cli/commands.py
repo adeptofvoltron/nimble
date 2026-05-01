@@ -18,6 +18,10 @@ def _running_pid_or_none(data: object) -> int | None:
     if not isinstance(data, dict):
         return None
     raw_pid = data.get("pid")
+
+    if raw_pid is None:
+        return None
+
     try:
         pid = int(raw_pid)
     except (TypeError, ValueError):
