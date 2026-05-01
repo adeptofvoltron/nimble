@@ -384,7 +384,7 @@ def test_parse_manifest_yaml_invalid_yaml() -> None:
 
 
 def test_parse_manifest_yaml_non_numeric_api_version() -> None:
-    content = _VALID_MANIFEST_YAML.replace('api_version: 1', 'api_version: "v1"')
+    content = _VALID_MANIFEST_YAML.replace("api_version: 1", 'api_version: "v1"')
     with pytest.raises(ManifestError, match="api_version"):
         parse_manifest_yaml(content)
 
