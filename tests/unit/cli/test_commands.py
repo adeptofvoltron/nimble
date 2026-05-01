@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import signal
-from unittest.mock import MagicMock
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
 from nimble.cli.commands import app
+from nimble.manifest.parser import ConfigError, NimbleConfig
 
 runner = CliRunner()
 
@@ -126,6 +126,46 @@ def test_stop_removes_pid_after_shutdown() -> None:
 
     assert result.exit_code == 0
     mock_remove.assert_called_once()
+
+
+def test_validate_valid_config() -> None:
+    with patch(
+        "nimble.manifest.parser.load_config",
+        return_value=NimbleConfig(skills=[]),
+    ):
+        result = runner.invoke(app, ["validate"])
+    assert result.exit_code == 0
+    assert "config.yaml is valid" in result.output
+
+
+def test_validate_invalid_config() -> None:
+    with patch(
+        "nimble.manifest.parser.load_config",
+        side_effect=ConfigError("config.yaml line 3: found character '\\t'"),
+    ):
+        result = runner.invoke(app, ["validate"])
+    assert result.exit_code == 1
+    assert "line 3" in result.output
+
+
+def test_validate_missing_config(tmp_path: Path) -> None:
+    with patch(
+        "nimble.manifest.parser.load_config",
+        side_effect=FileNotFoundError,
+    ):
+        result = runner.invoke(app, ["validate"])
+    assert result.exit_code == 1
+    assert "not found" in result.output
+
+
+def test_validate_unreadable_config() -> None:
+    with patch(
+        "nimble.manifest.parser.load_config",
+        side_effect=PermissionError("permission denied"),
+    ):
+        result = runner.invoke(app, ["validate"])
+    assert result.exit_code == 1
+    assert "Failed to read config.yaml" in result.output
 
 
 def test_terminate_windows_openprocess_failure_raises() -> None:

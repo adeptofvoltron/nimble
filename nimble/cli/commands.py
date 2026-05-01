@@ -164,5 +164,25 @@ def restart(
     typer.echo(f"Nimble restarted (PID {new_pid})")
 
 
+@app.command()
+def validate() -> None:
+    """Validate config.yaml without starting the daemon."""
+    from nimble.manifest.parser import ConfigError, load_config
+
+    config_path = _repo_root() / "config.yaml"
+    try:
+        load_config(config_path)
+    except ConfigError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1)
+    except FileNotFoundError:
+        typer.echo(f"config.yaml not found at {config_path}", err=True)
+        raise typer.Exit(1)
+    except OSError as exc:
+        typer.echo(f"Failed to read config.yaml: {exc}", err=True)
+        raise typer.Exit(1)
+    typer.echo("config.yaml is valid")
+
+
 if __name__ == "__main__":
     app()

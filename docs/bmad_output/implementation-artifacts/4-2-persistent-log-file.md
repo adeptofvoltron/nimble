@@ -1,6 +1,6 @@
 # Story 4.2: Persistent Log File
 
-Status: review
+Status: done
 
 ## Story
 
@@ -204,6 +204,27 @@ claude-sonnet-4-6
 - `tests/unit/skills/test_runner.py` (modified)
 - `tests/unit/worker/test_entrypoint.py` (modified)
 
+### Review Findings
+
+- [x] [Review][Patch] AC1 gap — `_dispatch` error handler in `daemon.py` must pass `exc_info=True` to emit full tracebacks [nimble/daemon.py:_dispatch]
+
+- [x] [Review][Patch] `configure_logging` not idempotent — duplicate handlers accumulate on repeated calls [nimble/logging_setup.py:18-20]
+- [x] [Review][Patch] Worker always logs at INFO — `--debug` flag not propagated to workers via env var [worker/entrypoint.py:21]
+- [x] [Review][Patch] `OSError` from `mkdir` or `RotatingFileHandler` constructor silently propagates and crashes the daemon [nimble/logging_setup.py:11-14]
+- [x] [Review][Patch] Missing `NullHandler` when `NIMBLE_LOG_PATH` is unset — Python's `lastResort` handler leaks to worker stderr (the IPC pipe) [worker/entrypoint.py:14-22]
+- [x] [Review][Patch] Log path hardcoded independently in `daemon.py` and `runner.py` — no single source of truth, can silently diverge [nimble/skills/runner.py:87, nimble/daemon.py:27]
+- [x] [Review][Patch] Weak `endswith("nimble.log")` assertion — should assert the full expected path [tests/unit/skills/test_runner.py:354]
+- [x] [Review][Patch] `test_log_path_env_wires_file_handler` does not assert `setFormatter` was called with the correct format string [tests/unit/worker/test_entrypoint.py:148]
+- [x] [Review][Patch] No test for `NIMBLE_LOG_PATH` unset path — `NullHandler` / silent-swallow behaviour is unverified [tests/unit/worker/test_entrypoint.py]
+
+- [x] [Review][Defer] Worker `FileHandler` has no `mkdir` guard for its parent path [worker/entrypoint.py:15-22] — deferred, pre-existing; daemon always creates the dir first
+- [x] [Review][Defer] Log format string duplicated verbatim in `logging_setup.py` and `worker/entrypoint.py` [nimble/logging_setup.py:7, worker/entrypoint.py:18] — deferred, pre-existing
+- [x] [Review][Defer] No `encoding` argument on `RotatingFileHandler` — may corrupt non-ASCII on non-UTF-8 locales [nimble/logging_setup.py:12-14] — deferred, pre-existing
+- [x] [Review][Defer] `importlib.reload` in entrypoint test is fragile but only viable approach for module-level init [tests/unit/worker/test_entrypoint.py:143] — deferred, pre-existing
+- [x] [Review][Defer] `_restore_root_logger` fixture does not restore state on pre-existing handlers [tests/unit/test_daemon_logging.py:13-20] — deferred, pre-existing
+- [x] [Review][Defer] `log_path is directory` edge case unguarded in `configure_logging` [nimble/logging_setup.py:12-14] — deferred, pre-existing; extremely unlikely
+
 ## Change Log
 
 - 2026-04-26: Implemented persistent log file (story 4-2) — RotatingFileHandler at `~/.nimble/nimble.log` (5MB/3 backups), NIMBLE_LOG_PATH env propagation to workers, worker FileHandler wiring. 5 new tests.
+- 2026-04-30: Code review complete — 1 decision-needed, 8 patches, 6 deferred, 3 dismissed.

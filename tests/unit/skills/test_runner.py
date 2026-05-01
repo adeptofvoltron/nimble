@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from nimble.logging_setup import LOG_PATH
 from nimble.skills.registry import SkillConfig, SkillRegistry
 from nimble.skills.runner import DispatchResult, SkillRunner
 from tests.conftest import FakeNotifier
@@ -353,8 +354,7 @@ def test_spawn_workers_passes_log_path_env() -> None:
         runner.spawn_workers([config])
 
     env = mock_popen.call_args.kwargs["env"]
-    assert "NIMBLE_LOG_PATH" in env
-    assert env["NIMBLE_LOG_PATH"].endswith("nimble.log")
+    assert env["NIMBLE_LOG_PATH"] == str(LOG_PATH)
 
 
 def test_spawn_workers_passes_skill_config_env() -> None:

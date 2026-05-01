@@ -11,7 +11,7 @@ from typing import Any
 
 from nimble.context.assembler import build_context
 from nimble.hotkeys import get_adapter
-from nimble.logging_setup import configure_logging
+from nimble.logging_setup import LOG_PATH, configure_logging
 from nimble.manifest.parser import ConfigError, load_config
 from nimble.notifier import Notifier
 from nimble.skills.loader import validate_skill_paths
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 def run(repo_root: Path, debug: bool = False) -> None:
-    configure_logging(Path.home() / ".nimble" / "nimble.log", debug)
+    configure_logging(LOG_PATH, debug)
 
     notifier = Notifier()
     registry = SkillRegistry()
@@ -41,7 +41,9 @@ def run(repo_root: Path, debug: bool = False) -> None:
         logger.error("Config error on startup: %s", exc)
         sys.exit(1)
 
-    runner = SkillRunner(registry, notifier, repo_root, ai_config=config.ai)
+    runner = SkillRunner(
+        registry, notifier, repo_root, ai_config=config.ai, debug=debug
+    )
     runner.spawn_workers(validated)
 
     for skill in validated:
