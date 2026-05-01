@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -27,6 +29,22 @@ class AiConfig:
 class NimbleConfig:
     skills: list[SkillConfig]
     ai: AiConfig | None = None
+
+
+def atomic_write(path: Path, content: str) -> None:
+    fd, tmp_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f"{path.name}.",
+        suffix=".tmp",
+    )
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        tmp.replace(path)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def read_skill_manifest(config: SkillConfig, base_path: Path) -> dict[str, Any] | None:

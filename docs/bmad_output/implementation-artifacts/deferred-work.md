@@ -68,3 +68,7 @@
 - `is_mac()` has no call sites — macOS hotkey adapter not yet implemented; `get_adapter()` raises `RuntimeError` on darwin. Resolves in Story 2.10 (cross-platform context capture / macOS support).
 - `is_linux()` returns `True` on Android (`sys.platform == "linux"`) — X11 adapter and xclip/xdotool will fail at runtime on Android. Not a current target platform; revisit if Android support is added.
 - Cygwin Python returns `sys.platform == "cygwin"`, so `is_windows()` returns `False` under Cygwin. `get_adapter()` raises `RuntimeError` with a clear message. Acceptable for v1; defer to platform edge-case story if Cygwin support is needed.
+
+## Deferred from: code review of 4-5-yaml-config-validation-and-nimble-validate.md (2026-05-01)
+
+- `nimble/manifest/parser.py:86`: `load_config` assumes YAML root is a mapping and may raise `AttributeError` for scalar/list roots (`data.get(...)`) — pre-existing parser behavior not introduced by this story; defer to parser-hardening follow-up.

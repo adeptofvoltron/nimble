@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-16"
-last_updated: "2026-05-01"  # 4-2 code review complete
+last_updated: "2026-05-01"  # 4-5 review complete
 project: "pixi (Nimble)"
 project_key: NOKEY
 tracking_system: file-system
@@ -78,7 +78,7 @@ development_status:
   4-2-persistent-log-file: done
   4-3-skill-lifecycle-hooks-on-load-on-error-on-unload: done
   4-4-api-version-compatibility-check: done
-  4-5-yaml-config-validation-and-nimble-validate: backlog
+  4-5-yaml-config-validation-and-nimble-validate: done
   4-6-platform-edge-case-handling-wayland-windows-reserved-hotkeys: backlog
   epic-4-retrospective: optional
 

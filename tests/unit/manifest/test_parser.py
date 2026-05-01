@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -8,6 +10,7 @@ from nimble.manifest.parser import (
     AiConfig,
     ConfigError,
     NimbleConfig,
+    atomic_write,
     load_config,
     read_skill_manifest,
 )
@@ -194,6 +197,48 @@ def test_read_skill_manifest_returns_none_for_absolute_skill_path(
     config = _make_skill_config(path="/tmp/my_skill/skill.py")
     result = read_skill_manifest(config, tmp_path)
     assert result is None
+
+
+def test_atomic_write_creates_file_with_correct_content(tmp_path: Path) -> None:
+    target = tmp_path / "config.yaml"
+    atomic_write(target, "hello: world\n")
+    assert target.read_text(encoding="utf-8") == "hello: world\n"
+
+
+def test_atomic_write_no_tmp_file_left_on_success(tmp_path: Path) -> None:
+    target = tmp_path / "config.yaml"
+    atomic_write(target, "data: 1\n")
+    assert list(tmp_path.glob("config.yaml*.tmp")) == []
+
+
+def test_atomic_write_preserves_original_on_failure(tmp_path: Path) -> None:
+    target = tmp_path / "config.yaml"
+    target.write_text("original", encoding="utf-8")
+
+    with patch.object(Path, "replace", side_effect=OSError("disk full")):
+        with pytest.raises(OSError):
+            atomic_write(target, "new content")
+
+    assert target.read_text(encoding="utf-8") == "original"
+    assert list(tmp_path.glob("config.yaml*.tmp")) == []
+
+
+def test_atomic_write_uses_same_directory_for_tmp(tmp_path: Path) -> None:
+    target = tmp_path / "config.yaml"
+    captured_dir: Path | None = None
+    original_mkstemp = tempfile.mkstemp
+
+    def capturing_mkstemp(*args: object, **kwargs: object) -> tuple[int, str]:
+        nonlocal captured_dir
+        captured_dir_value = kwargs.get("dir")
+        if captured_dir_value is not None:
+            captured_dir = Path(captured_dir_value)
+        return original_mkstemp(*args, **kwargs)  # type: ignore[arg-type]
+
+    with patch("tempfile.mkstemp", side_effect=capturing_mkstemp):
+        atomic_write(target, "content")
+
+    assert captured_dir == tmp_path
 
 
 def test_read_skill_manifest_returns_none_for_path_traversal(tmp_path: Path) -> None:
