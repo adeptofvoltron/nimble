@@ -46,7 +46,8 @@ def _parse_manifest_string_list(
         return []
     if not isinstance(raw, list) or any(not isinstance(item, str) for item in raw):
         raise ManifestError(
-            f"manifest.yaml from {source} field '{field_name}' must be a list of strings"
+            f"manifest.yaml from {source} field '{field_name}'"
+            " must be a list of strings"
         )
     return raw
 
@@ -241,11 +242,13 @@ def parse_manifest_yaml(content: str, source: str = "<string>") -> ManifestSpec:
         api_version = int(raw_api_version)
     except (TypeError, ValueError) as exc:
         raise ManifestError(
-            f"manifest.yaml from {source} field 'api_version' must be a positive integer"
+            f"manifest.yaml from {source} field 'api_version'"
+            " must be a positive integer"
         ) from exc
     if isinstance(raw_api_version, bool) or api_version < 1:
         raise ManifestError(
-            f"manifest.yaml from {source} field 'api_version' must be a positive integer"
+            f"manifest.yaml from {source} field 'api_version'"
+            " must be a positive integer"
         )
     if api_version > SUPPORTED_API_VERSION:
         raise ManifestError(

@@ -407,7 +407,9 @@ def test_parse_manifest_yaml_requires_defaults_to_empty() -> None:
 
 
 def test_parse_manifest_yaml_permissions_rejects_scalar() -> None:
-    content = _VALID_MANIFEST_YAML.replace("permissions:\n  - ai\n", "permissions: ai\n")
+    content = _VALID_MANIFEST_YAML.replace(
+        "permissions:\n  - ai\n", "permissions: ai\n"
+    )
     with pytest.raises(ManifestError, match="permissions"):
         parse_manifest_yaml(content)
 
