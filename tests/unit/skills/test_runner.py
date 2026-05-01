@@ -310,6 +310,27 @@ def test_check_for_dead_workers_skips_already_failed_worker() -> None:
     assert len(notifier.sent) == 0
 
 
+def test_check_for_dead_workers_skips_disabled_worker() -> None:
+    config = _make_config()
+    registry = SkillRegistry()
+    notifier = FakeNotifier()
+    runner = _make_runner(registry=registry, notifier=notifier)
+
+    fake_proc = _make_fake_proc({"invocation_id": "x", "status": "ok", "error": None})
+    fake_proc.poll.return_value = None
+
+    with patch("subprocess.Popen", return_value=fake_proc):
+        runner.spawn_workers([config])
+
+    registry.mark_disabled("my-skill")
+    fake_proc.poll.return_value = 1
+
+    runner.check_for_dead_workers()
+
+    assert registry.get("my-skill").status == "disabled"  # type: ignore[union-attr]
+    assert len(notifier.sent) == 0
+
+
 # ---------------------------------------------------------------------------
 # shutdown tests
 # ---------------------------------------------------------------------------

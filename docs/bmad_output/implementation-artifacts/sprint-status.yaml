@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-16"
-last_updated: "2026-05-01"  # 5-2 done
+last_updated: "2026-05-01"  # 5-3 done
 project: "pixi (Nimble)"
 project_key: NOKEY
 tracking_system: file-system
@@ -86,7 +86,7 @@ development_status:
   epic-5: in-progress
   5-1-state-file-and-daemon-heartbeat: done
   5-2-nimble-list-and-nimble-status: done
-  5-3-nimble-disable: backlog
+  5-3-nimble-disable: done
   epic-5-retrospective: optional
 
   # Epic 6: Community Skills — Install from GitHub with One Command

@@ -216,6 +216,25 @@ def validate() -> None:
     typer.echo("config.yaml is valid")
 
 
+@app.command()
+def disable(
+    skill_name: str = typer.Argument(..., help="Name of the skill to disable during current runtime"),
+) -> None:
+    """Disable a skill without editing config.yaml manually."""
+    from nimble.manifest.parser import disable_skill_in_config
+
+    config_path = _repo_root() / "config.yaml"
+    try:
+        disable_skill_in_config(config_path, skill_name)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1)
+    except OSError as exc:
+        typer.echo(f"Failed to update config.yaml: {exc}", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"Skill '{skill_name}' disabled")
+
+
 @app.command(name="list")
 def list_skills() -> None:
     """List all configured skills and their status."""
@@ -232,10 +251,7 @@ def list_skills() -> None:
 
     for skill in skills:
         name, source, binding, status = _skill_columns(skill)
-        typer.echo(
-            f"{name:<20} {source:<12}"
-            f" {binding:<20} {status}"
-        )
+        typer.echo(f"{name:<20} {source:<12}" f" {binding:<20} {status}")
 
 
 @app.command()
@@ -262,10 +278,7 @@ def status() -> None:
         name, source, binding, status_display = _skill_columns(
             skill, failed_marker=True
         )
-        typer.echo(
-            f"  {name:<20} {source:<12}"
-            f" {binding:<20} {status_display}"
-        )
+        typer.echo(f"  {name:<20} {source:<12}" f" {binding:<20} {status_display}")
 
 
 if __name__ == "__main__":

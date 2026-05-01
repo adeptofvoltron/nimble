@@ -302,6 +302,34 @@ def test_status_not_running() -> None:
     assert "not running" in result.output
 
 
+def test_disable_success() -> None:
+    with patch("nimble.manifest.parser.disable_skill_in_config"):
+        result = runner.invoke(app, ["disable", "hello-world"])
+    assert result.exit_code == 0
+    assert "disabled" in result.output
+
+
+def test_disable_skill_not_found() -> None:
+    message = "No skill named 'hello-world' found in config.yaml"
+    with patch(
+        "nimble.manifest.parser.disable_skill_in_config",
+        side_effect=ValueError(message),
+    ):
+        result = runner.invoke(app, ["disable", "hello-world"])
+    assert result.exit_code == 1
+    assert result.output.strip() == f"{message}"
+
+
+def test_disable_write_fails() -> None:
+    with patch(
+        "nimble.manifest.parser.disable_skill_in_config",
+        side_effect=OSError("disk full"),
+    ):
+        result = runner.invoke(app, ["disable", "hello-world"])
+    assert result.exit_code == 1
+    assert "Failed to update" in result.output
+
+
 def test_terminate_windows_openprocess_failure_raises() -> None:
     fake_kernel32 = MagicMock()
     fake_kernel32.OpenProcess.return_value = 0
