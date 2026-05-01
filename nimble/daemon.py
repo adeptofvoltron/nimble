@@ -39,7 +39,9 @@ def _build_skill_states(registry: SkillRegistry) -> list[SkillState]:
     ]
 
 
-def _state_signature(skills: list[SkillState]) -> tuple[tuple[str, str, str, str, int | None], ...]:
+def _state_signature(
+    skills: list[SkillState],
+) -> tuple[tuple[str, str, str, str, int | None], ...]:
     return tuple(
         (s.name, s.source, s.binding, s.status, s.worker_pid)
         for s in sorted(skills, key=lambda item: item.name)
