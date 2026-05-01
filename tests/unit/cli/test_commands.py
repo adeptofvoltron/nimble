@@ -213,6 +213,14 @@ def test_list_stale_state_file() -> None:
     assert "not running" in result.output
 
 
+def test_list_malformed_pid_treated_not_running() -> None:
+    data = {**_SAMPLE_STATE, "pid": "abc"}
+    with patch("nimble.cli.commands.state.read_state", return_value=data):
+        result = runner.invoke(app, ["list"])
+    assert result.exit_code == 0
+    assert "not running" in result.output
+
+
 def test_list_no_skills() -> None:
     data = {**_SAMPLE_STATE, "skills": []}
     with (
@@ -232,8 +240,22 @@ def test_status_shows_daemon_and_skills() -> None:
         result = runner.invoke(app, ["status"])
     assert result.exit_code == 0
     assert "12345" in result.output
+    assert "started_at=" in result.output
+    assert "daemon_version=" in result.output
     assert "1.0.0" in result.output
     assert "hello-world" in result.output
+
+
+def test_status_missing_header_fields_uses_fallbacks() -> None:
+    data = {"pid": 12345, "skills": []}
+    with (
+        patch("nimble.cli.commands.state.read_state", return_value=data),
+        patch("nimble.cli.commands.state.is_running", return_value=True),
+    ):
+        result = runner.invoke(app, ["status"])
+    assert result.exit_code == 0
+    assert "started_at=<unknown>" in result.output
+    assert "daemon_version=<unknown>" in result.output
 
 
 def test_status_failed_skill_marked() -> None:
@@ -256,6 +278,21 @@ def test_status_failed_skill_marked() -> None:
         result = runner.invoke(app, ["status"])
     assert result.exit_code == 0
     assert "[FAILED]" in result.output
+
+
+def test_status_malformed_skill_does_not_crash() -> None:
+    data = {
+        **_SAMPLE_STATE,
+        "skills": [123, {"name": "ok-only-name"}],
+    }
+    with (
+        patch("nimble.cli.commands.state.read_state", return_value=data),
+        patch("nimble.cli.commands.state.is_running", return_value=True),
+    ):
+        result = runner.invoke(app, ["status"])
+    assert result.exit_code == 0
+    assert "<invalid>" in result.output
+    assert "<unknown>" in result.output
 
 
 def test_status_not_running() -> None:

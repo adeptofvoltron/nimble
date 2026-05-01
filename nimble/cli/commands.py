@@ -14,6 +14,32 @@ from nimble.platform import is_windows
 app = typer.Typer(help="Nimble — cross-platform Python hotkey daemon.")
 
 
+def _running_pid_or_none(data: object) -> int | None:
+    if not isinstance(data, dict):
+        return None
+    raw_pid = data.get("pid")
+    try:
+        pid = int(raw_pid)
+    except (TypeError, ValueError):
+        return None
+    if pid <= 0 or not state.is_running(pid):
+        return None
+    return pid
+
+
+def _skill_columns(skill: object, failed_marker: bool = False) -> tuple[str, str, str, str]:
+    if not isinstance(skill, dict):
+        return ("<invalid>", "<invalid>", "<invalid>", "<invalid>")
+
+    name = str(skill.get("name", "<unknown>"))
+    source = str(skill.get("source", "<unknown>"))
+    binding = str(skill.get("binding", "<unknown>"))
+    status = str(skill.get("status", "<unknown>"))
+    if failed_marker and status == "failed":
+        status = "[FAILED]"
+    return (name, source, binding, status)
+
+
 def _repo_root() -> Path:
     # commands.py lives at nimble/cli/commands.py — 3 levels below repo root
     return Path(__file__).resolve().parent.parent.parent
@@ -188,21 +214,21 @@ def validate() -> None:
 def list_skills() -> None:
     """List all configured skills and their status."""
     data = state.read_state()
-    if data is None:
+    if data is None or _running_pid_or_none(data) is None:
         typer.echo("Nimble daemon is not running")
         return
-    pid = data.get("pid")
-    if pid is None or not state.is_running(int(pid)):
-        typer.echo("Nimble daemon is not running")
-        return
-    skills = data.get("skills", [])
-    if not skills:
+
+    raw_skills = data.get("skills", [])
+    skills = raw_skills if isinstance(raw_skills, list) else []
+    if len(skills) == 0:
         typer.echo("No skills loaded")
         return
+
     for skill in skills:
+        name, source, binding, status = _skill_columns(skill)
         typer.echo(
-            f"{skill['name']:<20} {skill['source']:<12}"
-            f" {skill['binding']:<20} {skill['status']}"
+            f"{name:<20} {source:<12}"
+            f" {binding:<20} {status}"
         )
 
 
@@ -210,24 +236,27 @@ def list_skills() -> None:
 def status() -> None:
     """Show daemon health and per-skill status."""
     data = state.read_state()
-    if data is None:
+    pid = None if data is None else _running_pid_or_none(data)
+    if data is None or pid is None:
         typer.echo("Nimble daemon is not running")
         return
-    pid = data.get("pid")
-    if pid is None or not state.is_running(int(pid)):
-        typer.echo("Nimble daemon is not running")
-        return
+
+    started_at = str(data.get("started_at", "<unknown>"))
+    daemon_version = str(data.get("daemon_version", "<unknown>"))
     typer.echo(
-        f"Daemon: pid={data['pid']}  started={data['started_at']}"
-        f"  version={data['daemon_version']}"
+        f"Daemon: pid={pid}  started_at={started_at}"
+        f"  daemon_version={daemon_version}"
     )
     typer.echo("")
     typer.echo("Skills:")
-    for skill in data.get("skills", []):
-        status_display = "[FAILED]" if skill["status"] == "failed" else skill["status"]
+
+    raw_skills = data.get("skills", [])
+    skills = raw_skills if isinstance(raw_skills, list) else []
+    for skill in skills:
+        name, source, binding, status_display = _skill_columns(skill, failed_marker=True)
         typer.echo(
-            f"  {skill['name']:<20} {skill['source']:<12}"
-            f" {skill['binding']:<20} {status_display}"
+            f"  {name:<20} {source:<12}"
+            f" {binding:<20} {status_display}"
         )
 
 

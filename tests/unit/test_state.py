@@ -12,6 +12,7 @@ from nimble.state import (
     SkillState,
     is_running,
     read_pid,
+    read_state,
     remove_pid,
     remove_state,
     write_pid,
@@ -154,6 +155,20 @@ def test_remove_state_deletes_file(tmp_path: Path) -> None:
 def test_remove_state_noop_if_absent(tmp_path: Path) -> None:
     with patch.object(state_module, "STATE_FILE", tmp_path / "state.json"):
         remove_state()  # should not raise
+
+
+def test_read_state_returns_none_when_file_missing(tmp_path: Path) -> None:
+    with patch.object(state_module, "STATE_FILE", tmp_path / "state.json"):
+        assert read_state() is None
+
+
+def test_read_state_returns_none_on_permission_error(tmp_path: Path) -> None:
+    state_file = tmp_path / "state.json"
+    with (
+        patch.object(state_module, "STATE_FILE", state_file),
+        patch("pathlib.Path.read_text", side_effect=PermissionError("denied")),
+    ):
+        assert read_state() is None
 
 
 def test_write_state_is_thread_safe(tmp_path: Path) -> None:

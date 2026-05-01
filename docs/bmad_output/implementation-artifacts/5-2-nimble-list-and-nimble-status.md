@@ -1,6 +1,6 @@
 # Story 5.2: `nimble list` and `nimble status`
 
-Status: review
+Status: done
 
 ## Story
 
@@ -60,6 +60,13 @@ so that I can quickly confirm what's running, what's bound to which shortcut, an
   - [x] `.venv/bin/mypy nimble/ tests/ worker/` — exits 0 (pre-existing 3 errors in `test_platform.py` unchanged; 0 new errors in `nimble/`)
   - [x] `.venv/bin/black --check nimble/ tests/ worker/` — exits 0
   - [x] `flake8 nimble/ tests/ worker/` — exits 0
+
+### Review Findings
+
+- [x] [Review][Patch] Unvalidated PID conversion can crash `nimble list/status` on malformed state [nimble/cli/commands.py:195]
+- [x] [Review][Patch] `status` header assumes required keys always exist and can raise `KeyError` [nimble/cli/commands.py:221]
+- [x] [Review][Patch] Skill row formatting uses strict dict indexing and can crash on malformed skill entries [nimble/cli/commands.py:204]
+- [x] [Review][Patch] `read_state()` does not handle non-JSON read failures (`OSError`/encoding errors) [nimble/state.py:87]
 
 ## Dev Notes
 

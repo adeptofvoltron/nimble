@@ -88,5 +88,5 @@ def read_state() -> dict[str, Any] | None:
     try:
         raw: dict[str, Any] = json.loads(STATE_FILE.read_text())
         return raw
-    except (FileNotFoundError, json.JSONDecodeError):
+    except (FileNotFoundError, OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None
