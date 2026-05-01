@@ -18,7 +18,10 @@ if _log_path:
         logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
     )
     logging.getLogger().addHandler(_handler)
-    logging.getLogger().setLevel(logging.INFO)
+    _debug = os.environ.get("NIMBLE_DEBUG") == "1"
+    logging.getLogger().setLevel(logging.DEBUG if _debug else logging.INFO)
+else:
+    logging.getLogger().addHandler(logging.NullHandler())
 
 import importlib.util  # noqa: E402
 import json  # noqa: E402
@@ -190,6 +193,7 @@ def run(module_path: str, class_name: str) -> None:
                 "error": None,
             }
         except Exception as exc:
+            logger.exception("Skill %s raised during dispatch", class_name)
             if hasattr(skill, "on_error"):
                 try:
                     skill.on_error(exc)

@@ -1,5 +1,14 @@
 # Deferred Work
 
+## Deferred from: code review of 4-2-persistent-log-file.md (2026-04-30)
+
+- `worker/entrypoint.py:15-22`: Worker `FileHandler` opens without a `mkdir` guard — daemon always creates `~/.nimble/` first so this is safe in practice; add mkdir if worker ever runs standalone.
+- `nimble/logging_setup.py:7` + `worker/entrypoint.py:18`: Log format string `"%(asctime)s %(levelname)s %(name)s: %(message)s"` is duplicated verbatim — export `_LOG_FORMAT` from `logging_setup.py` and import in worker in a future cleanup.
+- `nimble/logging_setup.py:12-14`: No `encoding` argument on `RotatingFileHandler` — may corrupt non-ASCII characters on Windows/non-UTF-8 locales; address in a Windows hardening story.
+- `tests/unit/worker/test_entrypoint.py:143`: `importlib.reload(entrypoint_mod)` is fragile for testing module-level init — only viable approach at present; revisit if module gains import-time state that isn't reload-safe.
+- `tests/unit/test_daemon_logging.py:13-20`: `_restore_root_logger` fixture does not restore formatters/levels on pre-existing handlers, leaving subtle cross-test pollution potential.
+- `nimble/logging_setup.py:12-14`: `log_path is directory` edge case (`IsADirectoryError`) is unguarded — extremely unlikely in practice.
+
 ## Deferred from: code review of 4-1-per-skill-exception-isolation-and-error-notifications.md (2026-04-26)
 
 - `nimble/daemon.py:152`: If `DispatchResult.status == "error"` but `result.error is None`, `_dispatch` sends no notification and does not log — consider logging a fallback or tightening runner invariants; not introduced by story 4-1 tests.

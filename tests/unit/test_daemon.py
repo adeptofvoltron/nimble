@@ -98,6 +98,7 @@ def test_startup_notification_fires(tmp_path: Path) -> None:
     mock_stop_event.wait.return_value = None
 
     with (
+        patch("nimble.daemon.configure_logging"),
         patch("nimble.daemon.get_adapter"),
         patch("nimble.daemon.load_config") as mock_load_config,
         patch("nimble.daemon.validate_skill_paths", return_value=[]),
@@ -120,6 +121,7 @@ def test_startup_notification_title_and_body(tmp_path: Path) -> None:
     mock_stop_event.wait.return_value = None
 
     with (
+        patch("nimble.daemon.configure_logging"),
         patch("nimble.daemon.get_adapter"),
         patch("nimble.daemon.load_config") as mock_load_config,
         patch("nimble.daemon.validate_skill_paths", return_value=[]),

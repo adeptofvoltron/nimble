@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from nimble import SUPPORTED_API_VERSION
+from nimble.logging_setup import LOG_PATH
 from nimble.manifest.parser import AiConfig, read_skill_manifest
 from nimble.platform import is_windows
 from nimble.skills.registry import SkillConfig, SkillRegistry, SkillWorker
@@ -66,11 +67,13 @@ class SkillRunner:
         notifier: Any,
         repo_root: Path,
         ai_config: AiConfig | None = None,
+        debug: bool = False,
     ) -> None:
         self._registry = registry
         self._notifier = notifier
         self._repo_root = repo_root
         self._ai_config = ai_config
+        self._debug = debug
 
     def spawn_workers(self, configs: list[SkillConfig]) -> None:
         spawned_workers: list[SkillWorker] = []
@@ -141,7 +144,8 @@ class SkillRunner:
                         **os.environ,
                         "NIMBLE_REPO_ROOT": str(self._repo_root),
                         "NIMBLE_AI_CONFIG": ai_config_json,
-                        "NIMBLE_LOG_PATH": str(Path.home() / ".nimble" / "nimble.log"),
+                        "NIMBLE_LOG_PATH": str(LOG_PATH),
+                        "NIMBLE_DEBUG": "1" if self._debug else "0",
                         "NIMBLE_SKILL_CONFIG": skill_config_json,
                     },
                 )

@@ -148,12 +148,33 @@ def test_log_path_env_wires_file_handler(
         with patch("logging.FileHandler") as mock_fh:
             importlib.reload(entrypoint_mod)
         mock_fh.assert_called_once_with(log_path)
+        fmt_arg = mock_fh.return_value.setFormatter.call_args[0][0]
+        assert fmt_arg._fmt == "%(asctime)s %(levelname)s %(name)s: %(message)s"
     finally:
         root.setLevel(original_level)
         for h in root.handlers[:]:
             if h not in original_handlers:
                 root.removeHandler(h)
         monkeypatch.delenv("NIMBLE_LOG_PATH", raising=False)
+
+
+def test_no_log_path_env_adds_null_handler(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("NIMBLE_LOG_PATH", raising=False)
+
+    root = logging.getLogger()
+    original_handlers = root.handlers[:]
+
+    try:
+        importlib.reload(entrypoint_mod)
+        new_handlers = [h for h in root.handlers if h not in original_handlers]
+        assert len(new_handlers) == 1
+        assert isinstance(new_handlers[0], logging.NullHandler)
+    finally:
+        for h in root.handlers[:]:
+            if h not in original_handlers:
+                root.removeHandler(h)
 
 
 # ---------------------------------------------------------------------------
