@@ -27,7 +27,9 @@ def _running_pid_or_none(data: object) -> int | None:
     return pid
 
 
-def _skill_columns(skill: object, failed_marker: bool = False) -> tuple[str, str, str, str]:
+def _skill_columns(
+    skill: object, failed_marker: bool = False
+) -> tuple[str, str, str, str]:
     if not isinstance(skill, dict):
         return ("<invalid>", "<invalid>", "<invalid>", "<invalid>")
 
@@ -253,7 +255,9 @@ def status() -> None:
     raw_skills = data.get("skills", [])
     skills = raw_skills if isinstance(raw_skills, list) else []
     for skill in skills:
-        name, source, binding, status_display = _skill_columns(skill, failed_marker=True)
+        name, source, binding, status_display = _skill_columns(
+            skill, failed_marker=True
+        )
         typer.echo(
             f"  {name:<20} {source:<12}"
             f" {binding:<20} {status_display}"
