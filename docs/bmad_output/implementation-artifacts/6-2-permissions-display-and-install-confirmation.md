@@ -1,6 +1,6 @@
 # Story 6.2: Permissions Display and Install Confirmation
 
-Status: review
+Status: done
 
 ## Story
 
@@ -49,7 +49,7 @@ So that I can make an informed decision about what I'm allowing to run on my mac
     - Trailing blank line before the prompt
   - [x] Prompt: `_prompt_install_confirm_y_only()` — echoes `Install anyway? [y/N]: ` (no newline), reads one line from stdin; returns `True` only for exactly `y` or `Y` (AC3)
   - [x] If not confirmed: `typer.echo("Installation cancelled."); raise typer.Exit(0)`
-  - [x] If confirmed: `typer.echo(f"Skill '{spec.name}' confirmed — installation is not implemented yet.")` — placeholder until Stories 6.3 / 6.5
+  - [x] If confirmed: lazy-import `InstallError, install_skill_venv` from `nimble.manifest.installer`; echo installing message; call `install_skill_venv(spec, _repo_root())` inside `try` / `except InstallError` (echo to stderr, `typer.Exit(1)`); on success echo completion line. Unexpected errors from the venv/pip path are normalized to `InstallError` inside `install_skill_venv` (Story 6.3 behavior delivered on the same branch as 6.2).
 
 - [x] Task 3: Add unit tests to `tests/unit/cli/test_commands.py` (AC: 1, 2, 3)
   - [x] Add `from nimble.manifest.parser import ManifestError, ManifestSpec` to imports (in the existing import block at top of file)
@@ -58,11 +58,11 @@ So that I can make an informed decision about what I'm allowing to run on my mac
   - [x] `test_add_displays_permissions_with_descriptions()` — patch `fetch_remote_manifest` returning spec with `permissions=["ai", "clipboard"]`; invoke with `input="N\n"`; assert `"ai"` in output; assert `"external LLM"` in output; assert `"clipboard"` in output; assert `"clipboard content"` in output
   - [x] `test_add_unknown_permission_shows_fallback()` — patch `fetch_remote_manifest` returning spec with `permissions=["filesystem"]`; invoke with `input="N\n"`; assert `"filesystem"` in output; assert `"(unknown permission)"` in output
   - [x] `test_add_no_permissions_shows_none_declared()` — patch `fetch_remote_manifest` returning spec with `permissions=[]`; invoke with `input="N\n"`; assert `"(none declared)"` in output
-  - [x] `test_add_confirms_and_proceeds()` — patch `fetch_remote_manifest` returning `_make_manifest_spec()`; invoke with `input="y\n"`; assert exit_code 0; assert `"cancelled"` NOT in output (install confirmation went through)
+  - [x] `test_add_confirms_and_proceeds()` — patch `fetch_remote_manifest`, `_repo_root`, and `install_skill_venv`; invoke with `input="y\n"`; assert exit_code 0; assert `"cancelled"` NOT in output; `install_skill_venv` called once with the manifest spec and fake repo root
   - [x] `test_add_manifest_error_aborts()` — patch `fetch_remote_manifest` to raise `ManifestError("HTTP 404")`; invoke; assert exit_code 1; assert `"HTTP 404"` in output
   - [x] `test_add_default_is_no()` — patch `fetch_remote_manifest`; invoke with `input="\n"` (empty = Enter); assert `"cancelled"` in output; assert exit_code 0
-  - [x] `test_add_uppercase_Y_confirms()` — patch `fetch_remote_manifest`; invoke with `input="Y\n"`; assert exit_code 0; assert `"cancelled"` NOT in output
-  - [x] `test_add_full_word_yes_aborts()` — patch `fetch_remote_manifest`; invoke with `input="yes\n"`; assert cancelled (AC3: only `y`/`Y` proceed)
+  - [x] `test_add_uppercase_Y_confirms()` — same install patches as `test_add_confirms_and_proceeds` with `input="Y\n"`
+  - [x] `test_add_full_word_yes_aborts()` — patch `fetch_remote_manifest` and `install_skill_venv`; invoke with `input="yes\n"`; assert cancelled; assert installer `not_called` (AC3: only `y`/`Y` proceed)
 
 - [x] Task 4: Verify quality gates
   - [x] `.venv/bin/pytest tests/unit/ -q` — all tests pass (baseline 254 + ~8 new = ~262)
@@ -259,7 +259,7 @@ claude-sonnet-4-6
 ### Completion Notes List
 
 - Added `_PERMISSION_DESCRIPTIONS` module-level constant to `nimble/cli/commands.py` with descriptions for all 5 known tool permissions (`ai`, `clipboard`, `popup`, `tts`, `input`); unknown permissions fall back to `"(unknown permission)"`.
-- Added `nimble add <shortcut> <repo_url>` command: fetches remote manifest, displays skill name/description/author/permissions block, strict `y`/`Y`-only install prompt (AC3), aborts cleanly on cancel, neutral placeholder on confirm.
+- Added `nimble add <shortcut> <repo_url>` command: fetches remote manifest, displays skill name/description/author/permissions block, strict `y`/`Y`-only install prompt (AC3), aborts cleanly on cancel, then runs per-skill venv install (`install_skill_venv`) when confirmed (combined with Story 6.3 on this branch).
 - Added 9 unit tests (including `test_add_full_word_yes_aborts`). Patched at `nimble.manifest.parser.fetch_remote_manifest` (lazy import pattern).
 - Added `extend-ignore = E203` to `setup.cfg` flake8 config to resolve black/flake8 conflict on slice notation (`url[len(prefix) :]`).
 - All 268 tests pass; `nimble/` mypy clean; black clean; flake8 clean.
@@ -267,15 +267,28 @@ claude-sonnet-4-6
 ### File List
 
 - `nimble/cli/commands.py`
+- `nimble/manifest/installer.py`
 - `tests/unit/cli/test_commands.py`
+- `tests/unit/manifest/test_installer.py`
 - `setup.cfg`
 
 ## Change Log
 
 - 2026-05-02: Implemented Story 6.2 — added `nimble add` command with permissions display and install confirmation prompt; 8 new unit tests; flake8 E203 config fix (Date: 2026-05-02)
+- 2026-05-02: Code review — combined 6.2+6.3 post-confirm behavior documented; tightened `add` tests (`assert_called_once_with`, `assert_not_called` for `yes`); sprint status set to `done`.
 
 ### Review Findings
 
 - [x] [Review][Patch] Install confirmation accepts `yes` / `YES` and other Click truthy tokens, but AC3 requires only `y` / `Y` to proceed and any other input (including full word `yes`) to abort — replace `typer.confirm` with a strict prompt or post-check the normalized answer [`nimble/cli/commands.py` — `add()` confirm block] — **resolved 2026-05-02:** `_prompt_install_confirm_y_only()` + `test_add_full_word_yes_aborts`
 
 - [x] [Review][Patch] User-facing placeholder mentions internal story id (`Story 6.3`); prefer neutral copy for end users (e.g. “installation is not implemented yet”) [`nimble/cli/commands.py` — post-confirm `typer.echo`] — **resolved 2026-05-02:** neutral confirmation message
+
+- [x] [Review][Decision] Story 6.2 spec vs. post-confirm behavior — **resolved 2026-05-02:** Combined 6.2+6.3 delivery on this branch; Task 2 and tests updated so the story matches `install_skill_venv` after confirm.
+
+- [x] [Review][Patch] Uncaught exceptions from installer — **resolved 2026-05-02:** `install_skill_venv` wraps non-`InstallError` failures in `InstallError` before they reach `add()` (`nimble/manifest/installer.py`).
+
+- [x] [Review][Patch] Weak success-path test assertions — **resolved 2026-05-02:** `assert_called_once_with(spec, fake_root)` with patched `_repo_root`.
+
+- [x] [Review][Patch] Stale negative assertion in `test_add_full_word_yes_aborts` — **resolved 2026-05-02:** Patched `install_skill_venv` and `assert_not_called()`.
+
+- [x] [Review][Patch] Co-ship installer module with CLI hookup — **resolved 2026-05-02:** `nimble/manifest/installer.py` and `tests/unit/manifest/test_installer.py` staged for version control with the CLI wiring.
