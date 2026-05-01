@@ -168,6 +168,140 @@ def test_validate_unreadable_config() -> None:
     assert "Failed to read config.yaml" in result.output
 
 
+_SAMPLE_STATE = {
+    "pid": 12345,
+    "started_at": "2026-05-01T10:00:00+00:00",
+    "daemon_version": "1.0.0",
+    "skills": [
+        {
+            "name": "hello-world",
+            "source": "local",
+            "binding": "ctrl+shift+h",
+            "status": "loaded",
+            "worker_pid": 12346,
+        }
+    ],
+}
+
+
+def test_list_shows_skills_when_running() -> None:
+    with (
+        patch("nimble.cli.commands.state.read_state", return_value=_SAMPLE_STATE),
+        patch("nimble.cli.commands.state.is_running", return_value=True),
+    ):
+        result = runner.invoke(app, ["list"])
+    assert result.exit_code == 0
+    assert "hello-world" in result.output
+    assert "ctrl+shift+h" in result.output
+    assert "loaded" in result.output
+
+
+def test_list_no_state_file() -> None:
+    with patch("nimble.cli.commands.state.read_state", return_value=None):
+        result = runner.invoke(app, ["list"])
+    assert result.exit_code == 0
+    assert "not running" in result.output
+
+
+def test_list_stale_state_file() -> None:
+    with (
+        patch("nimble.cli.commands.state.read_state", return_value=_SAMPLE_STATE),
+        patch("nimble.cli.commands.state.is_running", return_value=False),
+    ):
+        result = runner.invoke(app, ["list"])
+    assert result.exit_code == 0
+    assert "not running" in result.output
+
+
+def test_list_malformed_pid_treated_not_running() -> None:
+    data = {**_SAMPLE_STATE, "pid": "abc"}
+    with patch("nimble.cli.commands.state.read_state", return_value=data):
+        result = runner.invoke(app, ["list"])
+    assert result.exit_code == 0
+    assert "not running" in result.output
+
+
+def test_list_no_skills() -> None:
+    data = {**_SAMPLE_STATE, "skills": []}
+    with (
+        patch("nimble.cli.commands.state.read_state", return_value=data),
+        patch("nimble.cli.commands.state.is_running", return_value=True),
+    ):
+        result = runner.invoke(app, ["list"])
+    assert result.exit_code == 0
+    assert "No skills loaded" in result.output
+
+
+def test_status_shows_daemon_and_skills() -> None:
+    with (
+        patch("nimble.cli.commands.state.read_state", return_value=_SAMPLE_STATE),
+        patch("nimble.cli.commands.state.is_running", return_value=True),
+    ):
+        result = runner.invoke(app, ["status"])
+    assert result.exit_code == 0
+    assert "12345" in result.output
+    assert "started_at=" in result.output
+    assert "daemon_version=" in result.output
+    assert "1.0.0" in result.output
+    assert "hello-world" in result.output
+
+
+def test_status_missing_header_fields_uses_fallbacks() -> None:
+    data = {"pid": 12345, "skills": []}
+    with (
+        patch("nimble.cli.commands.state.read_state", return_value=data),
+        patch("nimble.cli.commands.state.is_running", return_value=True),
+    ):
+        result = runner.invoke(app, ["status"])
+    assert result.exit_code == 0
+    assert "started_at=<unknown>" in result.output
+    assert "daemon_version=<unknown>" in result.output
+
+
+def test_status_failed_skill_marked() -> None:
+    data = {
+        **_SAMPLE_STATE,
+        "skills": [
+            {
+                "name": "hello-world",
+                "source": "local",
+                "binding": "ctrl+shift+h",
+                "status": "failed",
+                "worker_pid": 12346,
+            }
+        ],
+    }
+    with (
+        patch("nimble.cli.commands.state.read_state", return_value=data),
+        patch("nimble.cli.commands.state.is_running", return_value=True),
+    ):
+        result = runner.invoke(app, ["status"])
+    assert result.exit_code == 0
+    assert "[FAILED]" in result.output
+
+
+def test_status_malformed_skill_does_not_crash() -> None:
+    data = {
+        **_SAMPLE_STATE,
+        "skills": [123, {"name": "ok-only-name"}],
+    }
+    with (
+        patch("nimble.cli.commands.state.read_state", return_value=data),
+        patch("nimble.cli.commands.state.is_running", return_value=True),
+    ):
+        result = runner.invoke(app, ["status"])
+    assert result.exit_code == 0
+    assert "<invalid>" in result.output
+    assert "<unknown>" in result.output
+
+
+def test_status_not_running() -> None:
+    with patch("nimble.cli.commands.state.read_state", return_value=None):
+        result = runner.invoke(app, ["status"])
+    assert result.exit_code == 0
+    assert "not running" in result.output
+
+
 def test_terminate_windows_openprocess_failure_raises() -> None:
     fake_kernel32 = MagicMock()
     fake_kernel32.OpenProcess.return_value = 0

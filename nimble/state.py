@@ -5,6 +5,7 @@ import os
 import threading
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 NIMBLE_DIR: Path = Path.home() / ".nimble"
 PID_FILE: Path = NIMBLE_DIR / "nimble.pid"
@@ -81,3 +82,11 @@ def is_running(pid: int) -> bool:
         return True
     except OSError:
         return False
+
+
+def read_state() -> dict[str, Any] | None:
+    try:
+        raw: dict[str, Any] = json.loads(STATE_FILE.read_text())
+        return raw
+    except (FileNotFoundError, OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
