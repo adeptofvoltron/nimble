@@ -84,7 +84,7 @@ development_status:
 
   # Epic 5: Operational Visibility — Inspect and Manage Without Touching Files
   epic-5: in-progress
-  5-1-state-file-and-daemon-heartbeat: review
+  5-1-state-file-and-daemon-heartbeat: done
   5-2-nimble-list-and-nimble-status: backlog
   5-3-nimble-disable: backlog
   epic-5-retrospective: optional

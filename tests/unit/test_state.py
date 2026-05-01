@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 from unittest.mock import patch
 
@@ -153,3 +154,44 @@ def test_remove_state_deletes_file(tmp_path: Path) -> None:
 def test_remove_state_noop_if_absent(tmp_path: Path) -> None:
     with patch.object(state_module, "STATE_FILE", tmp_path / "state.json"):
         remove_state()  # should not raise
+
+
+def test_write_state_is_thread_safe(tmp_path: Path) -> None:
+    state_file = tmp_path / "state.json"
+    errors: list[Exception] = []
+
+    def _writer(worker_id: int) -> None:
+        try:
+            for i in range(30):
+                write_state(
+                    worker_id,
+                    f"2026-05-01T00:00:{i:02d}+00:00",
+                    "1.0.0",
+                    [
+                        SkillState(
+                            name=f"s-{worker_id}",
+                            source="local",
+                            binding="ctrl+a",
+                            status="loaded",
+                            worker_pid=worker_id,
+                        )
+                    ],
+                )
+        except Exception as exc:
+            errors.append(exc)
+
+    with (
+        patch.object(state_module, "NIMBLE_DIR", tmp_path),
+        patch.object(state_module, "STATE_FILE", state_file),
+    ):
+        t1 = threading.Thread(target=_writer, args=(1,))
+        t2 = threading.Thread(target=_writer, args=(2,))
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+        data = json.loads(state_file.read_text())
+
+    assert errors == []
+    assert data["pid"] in {1, 2}
+    assert data["skills"][0]["name"] in {"s-1", "s-2"}

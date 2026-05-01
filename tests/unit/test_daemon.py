@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import nimble.daemon as daemon_module
+from nimble.state import SkillState
 from nimble.skills.runner import DispatchResult, SkillError
 
 from tests.conftest import FakeNotifier
@@ -206,6 +207,62 @@ def test_run_writes_state_on_startup(tmp_path: Path) -> None:
         with pytest.raises((KeyboardInterrupt, SystemExit)):
             daemon_module.run(tmp_path)
     assert mock_write_state.called
+
+
+def test_run_heartbeat_checks_dead_workers_and_rewrites_state(tmp_path: Path) -> None:
+    class _ImmediateThread:
+        def __init__(self, target: object) -> None:
+            self._target = target
+
+        def start(self) -> None:
+            if callable(self._target):
+                self._target()
+
+    with (
+        patch("nimble.daemon.load_config", return_value=MagicMock(skills=[], ai=None)),
+        patch("nimble.daemon.validate_skill_paths", return_value=[]),
+        patch("nimble.daemon.get_adapter"),
+        patch("nimble.daemon.Notifier"),
+        patch("nimble.daemon.configure_logging"),
+        patch(
+            "nimble.daemon._build_skill_states",
+            side_effect=[
+                [
+                    SkillState(
+                        name="skill",
+                        source="local",
+                        binding="ctrl+a",
+                        status="loaded",
+                        worker_pid=1001,
+                    )
+                ],
+                [
+                    SkillState(
+                        name="skill",
+                        source="local",
+                        binding="ctrl+a",
+                        status="disabled",
+                        worker_pid=None,
+                    )
+                ],
+            ],
+        ),
+        patch("nimble.daemon.SkillRunner") as mock_runner_cls,
+        patch("nimble.daemon.write_pid"),
+        patch("nimble.daemon.ConfigWatcher"),
+        patch("nimble.daemon.write_state") as mock_write_state,
+        patch("nimble.daemon.remove_state"),
+        patch("nimble.daemon.remove_pid"),
+        patch("nimble.daemon.threading.Event") as mock_event_cls,
+        patch("nimble.daemon.threading.Thread") as mock_thread_cls,
+    ):
+        mock_event_cls.return_value.wait.side_effect = [False, True, KeyboardInterrupt]
+        mock_thread_cls.side_effect = lambda *a, **kw: _ImmediateThread(kw["target"])
+        with pytest.raises((KeyboardInterrupt, SystemExit)):
+            daemon_module.run(tmp_path)
+
+    assert mock_runner_cls.return_value.check_for_dead_workers.called
+    assert mock_write_state.call_count >= 2
 
 
 def test_run_removes_state_on_shutdown(tmp_path: Path) -> None:

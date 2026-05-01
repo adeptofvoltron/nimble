@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
 NIMBLE_DIR: Path = Path.home() / ".nimble"
 PID_FILE: Path = NIMBLE_DIR / "nimble.pid"
 STATE_FILE: Path = NIMBLE_DIR / "state.json"
+_STATE_WRITE_LOCK = threading.Lock()
 
 
 @dataclass
@@ -60,9 +62,10 @@ def write_state(
             for s in skills
         ],
     }
-    tmp = STATE_FILE.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(data))
-    tmp.rename(STATE_FILE)
+    with _STATE_WRITE_LOCK:
+        tmp = STATE_FILE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(data))
+        tmp.rename(STATE_FILE)
 
 
 def remove_state() -> None:

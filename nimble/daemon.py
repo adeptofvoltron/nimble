@@ -6,6 +6,7 @@ import os
 import signal
 import sys
 import threading
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -36,6 +37,13 @@ def _build_skill_states(registry: SkillRegistry) -> list[SkillState]:
         )
         for w in registry.all()
     ]
+
+
+def _state_signature(skills: list[SkillState]) -> tuple[tuple[str, str, str, str, int | None], ...]:
+    return tuple(
+        (s.name, s.source, s.binding, s.status, s.worker_pid)
+        for s in sorted(skills, key=lambda item: item.name)
+    )
 
 
 def run(repo_root: Path, debug: bool = False) -> None:
@@ -80,15 +88,28 @@ def run(repo_root: Path, debug: bool = False) -> None:
         sys.exit(1)
     write_pid(os.getpid())
     started = True
+    pid = os.getpid()
     started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    write_state(os.getpid(), started_at, __version__, _build_skill_states(registry))
+    initial_skills = _build_skill_states(registry)
+    write_state(pid, started_at, __version__, initial_skills)
+    last_signature = _state_signature(initial_skills)
 
     def _heartbeat() -> None:
-        while not stop_event.wait(5.0):
-            runner.check_for_dead_workers()
-            write_state(
-                os.getpid(), started_at, __version__, _build_skill_states(registry)
-            )
+        nonlocal last_signature
+        next_heartbeat_at = time.monotonic() + 5.0
+        while not stop_event.wait(0.5):
+            try:
+                runner.check_for_dead_workers()
+                skills = _build_skill_states(registry)
+                current_signature = _state_signature(skills)
+                now = time.monotonic()
+                should_force_heartbeat = now >= next_heartbeat_at
+                if current_signature != last_signature or should_force_heartbeat:
+                    write_state(pid, started_at, __version__, skills)
+                    last_signature = current_signature
+                    next_heartbeat_at = now + 5.0
+            except Exception:
+                logger.exception("Heartbeat update failed; continuing")
 
     heartbeat_thread = threading.Thread(target=_heartbeat, daemon=True)
     heartbeat_thread.start()
@@ -159,7 +180,8 @@ def run(repo_root: Path, debug: bool = False) -> None:
             len(to_remove),
             len(unchanged),
         )
-        write_state(os.getpid(), started_at, __version__, _build_skill_states(registry))
+        skills = _build_skill_states(registry)
+        write_state(pid, started_at, __version__, skills)
 
     watcher = ConfigWatcher(config_path, _reload_config)
     watcher.start()

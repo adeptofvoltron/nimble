@@ -1,6 +1,6 @@
 # Story 5.1: State File and Daemon Heartbeat
 
-Status: review
+Status: done
 
 ## Story
 
@@ -468,3 +468,11 @@ Added `_build_skill_states()` module-level helper and integrated state writes in
 ## Change Log
 
 - 2026-05-01: Implemented state file and daemon heartbeat (Story 5.1) — added `STATE_FILE`, `SkillState`, `write_state`, `remove_state` to `nimble/state.py`; integrated heartbeat thread, initial write, config reload write, and shutdown cleanup in `nimble/daemon.py`; 8 new tests added
+
+### Review Findings
+
+- [x] [Review][Patch] Concurrent state writes share a single temp file and can race [nimble/state.py]
+- [x] [Review][Patch] Heartbeat loop can die permanently on write/check exceptions [nimble/daemon.py]
+- [x] [Review][Patch] Dead-worker status updates are deferred to heartbeat, not immediate [nimble/daemon.py]
+- [x] [Review][Patch] Missing test coverage for heartbeat dead-worker check and periodic rewrite contract [tests/unit/test_daemon.py]
+- [x] [Review][Patch] Missing concurrency test for reload-vs-heartbeat state writes [tests/unit/test_state.py]
