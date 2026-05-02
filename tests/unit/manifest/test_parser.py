@@ -13,8 +13,11 @@ from nimble.manifest.parser import (
     AiConfig,
     ConfigError,
     ManifestError,
+    ManifestSpec,
     NimbleConfig,
+    append_skill_to_config,
     atomic_write,
+    remove_skill_entry_from_config,
     disable_skill_in_config,
     fetch_remote_manifest,
     load_config,
@@ -500,3 +503,147 @@ def test_fetch_remote_manifest_network_error() -> None:
     with patch("urllib.request.urlopen", side_effect=OSError("timeout")):
         with pytest.raises(ManifestError, match="Could not fetch"):
             fetch_remote_manifest("github.com/user/unreachable-skill")
+
+
+# ---------------------------------------------------------------------------
+# append_skill_to_config tests
+# ---------------------------------------------------------------------------
+
+
+def _make_manifest_spec(**overrides: object) -> ManifestSpec:
+    defaults: dict[str, object] = {
+        "name": "log-diagnosis",
+        "version": "1.0.0",
+        "api_version": 1,
+        "description": "A log diagnosis skill",
+        "entrypoint": "skill.py",
+        "permissions": [],
+        "dependencies": [],
+        "author": "Test Author",
+        "class_name": "LogDiagnosisSkill",
+    }
+    defaults.update(overrides)
+    return ManifestSpec(**defaults)  # type: ignore[arg-type]
+
+
+def test_append_skill_to_config_adds_entry(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("skills: []\n", encoding="utf-8")
+    spec = _make_manifest_spec()
+    append_skill_to_config(
+        cfg, spec, "ctrl+shift+d", "https://github.com/u/log-diagnosis", tmp_path
+    )
+    import yaml as _yaml
+
+    data = _yaml.safe_load(cfg.read_text(encoding="utf-8"))
+    assert len(data["skills"]) == 1
+    entry = data["skills"][0]
+    assert entry["name"] == "log-diagnosis"
+    assert entry["source"] == "community"
+    assert entry["path"] == ".nimble/skills/log-diagnosis/skill.py"
+    assert entry["class_name"] == "LogDiagnosisSkill"
+    assert entry["binding"] == "ctrl+shift+d"
+    assert entry["installed_from"] == "https://github.com/u/log-diagnosis"
+    assert entry["version"] == "1.0.0"
+
+
+def test_append_skill_to_config_preserves_existing(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        "skills:\n"
+        "  - name: hello-world\n"
+        "    source: local\n"
+        "    path: skills/hello_world/skill.py\n"
+        "    class_name: HelloWorldSkill\n"
+        "    binding: ctrl+l\n",
+        encoding="utf-8",
+    )
+    spec = _make_manifest_spec()
+    append_skill_to_config(
+        cfg, spec, "ctrl+shift+d", "https://github.com/u/log-diagnosis", tmp_path
+    )
+    import yaml as _yaml
+
+    data = _yaml.safe_load(cfg.read_text(encoding="utf-8"))
+    assert len(data["skills"]) == 2
+    assert data["skills"][0]["name"] == "hello-world"
+    assert data["skills"][1]["name"] == "log-diagnosis"
+
+
+def test_append_skill_to_config_empty_class_name_raises(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("skills: []\n", encoding="utf-8")
+    spec = _make_manifest_spec(class_name="")
+    original = cfg.read_text(encoding="utf-8")
+    with pytest.raises(ConfigError, match="class_name"):
+        append_skill_to_config(
+            cfg, spec, "ctrl+shift+d", "https://github.com/u/s", tmp_path
+        )
+    assert cfg.read_text(encoding="utf-8") == original
+
+
+def test_append_skill_to_config_uses_atomic_write(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("skills: []\n", encoding="utf-8")
+    spec = _make_manifest_spec()
+    with patch("nimble.manifest.parser.atomic_write") as mock_aw:
+        append_skill_to_config(
+            cfg, spec, "ctrl+shift+d", "https://github.com/u/s", tmp_path
+        )
+    mock_aw.assert_called_once()
+
+
+def test_append_skill_to_config_skills_must_be_list(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("skills: {}\n", encoding="utf-8")
+    spec = _make_manifest_spec()
+    with pytest.raises(ConfigError, match="skills.*list"):
+        append_skill_to_config(
+            cfg, spec, "ctrl+shift+d", "https://github.com/u/s", tmp_path
+        )
+
+
+def test_append_skill_to_config_whitespace_class_name_raises(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("skills: []\n", encoding="utf-8")
+    spec = _make_manifest_spec(class_name="   ")
+    with pytest.raises(ConfigError, match="class_name"):
+        append_skill_to_config(
+            cfg, spec, "ctrl+shift+d", "https://github.com/u/s", tmp_path
+        )
+
+
+def test_remove_skill_entry_from_config_removes_last_match(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        "skills:\n"
+        "  - name: log-diagnosis\n"
+        "    source: community\n"
+        "    binding: a\n"
+        "  - name: log-diagnosis\n"
+        "    source: community\n"
+        "    binding: b\n",
+        encoding="utf-8",
+    )
+    remove_skill_entry_from_config(cfg, "log-diagnosis")
+    import yaml as _yaml
+
+    data = _yaml.safe_load(cfg.read_text(encoding="utf-8"))
+    assert len(data["skills"]) == 1
+    assert data["skills"][0]["binding"] == "a"
+
+
+def test_remove_skill_entry_from_config_not_found_raises(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("skills: []\n", encoding="utf-8")
+    with pytest.raises(ConfigError, match="Rollback failed"):
+        remove_skill_entry_from_config(cfg, "missing")
+
+
+def test_remove_skill_entry_from_config_skills_not_list_raises(
+    tmp_path: Path,
+) -> None:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("skills: {}\n", encoding="utf-8")
+    with pytest.raises(ConfigError, match="Rollback failed"):
+        remove_skill_entry_from_config(cfg, "x")

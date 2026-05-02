@@ -95,7 +95,7 @@ development_status:
   6-2-permissions-display-and-install-confirmation: done
   6-3-per-skill-venv-creation-and-dependency-installation: done
   6-4-dependency-conflict-detection: done
-  6-5-config-append-manifest-lock-and-nimble-skills-structure: backlog
+  6-5-config-append-manifest-lock-and-nimble-skills-structure: done
   epic-6-retrospective: optional
 
   # Epic 7: Launch-Ready — Developer Experience & Ecosystem Artifacts

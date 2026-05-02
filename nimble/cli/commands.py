@@ -335,16 +335,65 @@ def add(
         typer.echo("Installation cancelled.")
         raise typer.Exit(0)
 
-    from nimble.manifest.installer import InstallError, install_skill_venv
+    import shutil
+
+    from nimble.manifest.installer import (
+        InstallError,
+        clone_skill_repo,
+        install_skill_venv,
+    )
+    from nimble.manifest.lock import write_lock_entry
+    from nimble.manifest.parser import (
+        ConfigError,
+        append_skill_to_config,
+        remove_skill_entry_from_config,
+    )
 
     typer.echo(f"Installing '{spec.name}'...")
+    repo_root = _repo_root()
+    skill_dir = repo_root / ".nimble" / "skills" / spec.name
+
     try:
-        install_skill_venv(spec, _repo_root())
+        clone_skill_repo(repo_url, skill_dir)
+    except InstallError as exc:
+        shutil.rmtree(skill_dir, ignore_errors=True)
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1)
+
+    try:
+        install_skill_venv(spec, repo_root)
     except InstallError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1)
 
-    typer.echo(f"Dependencies installed for '{spec.name}'.")
+    config_path = repo_root / "config.yaml"
+    try:
+        append_skill_to_config(config_path, spec, shortcut, repo_url, repo_root)
+    except ConfigError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1)
+
+    lock_path = repo_root / ".nimble" / "manifest.lock"
+    try:
+        write_lock_entry(lock_path, spec.name, repo_url, spec.version)
+    except Exception as exc:
+        try:
+            remove_skill_entry_from_config(config_path, spec.name)
+        except ConfigError as rb_exc:
+            typer.echo(
+                f"Failed to update manifest.lock ({exc}). "
+                f"Could not roll back config.yaml: {rb_exc}",
+                err=True,
+            )
+            raise typer.Exit(1)
+        typer.echo(
+            f"Failed to update manifest.lock ({exc}). "
+            "The new skill entry was removed from config.yaml.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    typer.echo(f"Skill '{spec.name}' installed and bound to {shortcut}.")
 
 
 if __name__ == "__main__":

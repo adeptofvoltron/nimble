@@ -414,7 +414,10 @@ def test_add_confirms_and_proceeds() -> None:
             return_value=spec,
         ),
         patch("nimble.cli.commands._repo_root", return_value=fake_root),
+        patch("nimble.manifest.installer.clone_skill_repo"),
         patch("nimble.manifest.installer.install_skill_venv") as mock_install,
+        patch("nimble.manifest.parser.append_skill_to_config"),
+        patch("nimble.manifest.lock.write_lock_entry"),
     ):
         result = runner.invoke(
             app, ["add", "ctrl+shift+d", "github.com/user/skill"], input="y\n"
@@ -471,7 +474,10 @@ def test_add_uppercase_Y_confirms() -> None:
             return_value=spec,
         ),
         patch("nimble.cli.commands._repo_root", return_value=fake_root),
+        patch("nimble.manifest.installer.clone_skill_repo"),
         patch("nimble.manifest.installer.install_skill_venv") as mock_install,
+        patch("nimble.manifest.parser.append_skill_to_config"),
+        patch("nimble.manifest.lock.write_lock_entry"),
     ):
         result = runner.invoke(
             app, ["add", "ctrl+shift+d", "github.com/user/skill"], input="Y\n"
@@ -487,6 +493,7 @@ def test_add_install_error_exits_with_code_1() -> None:
             "nimble.manifest.parser.fetch_remote_manifest",
             return_value=_make_manifest_spec(),
         ),
+        patch("nimble.manifest.installer.clone_skill_repo"),
         patch(
             "nimble.manifest.installer.install_skill_venv",
             side_effect=InstallError("pip failed"),
@@ -497,6 +504,35 @@ def test_add_install_error_exits_with_code_1() -> None:
         )
     assert result.exit_code == 1
     assert "pip failed" in result.output
+
+
+def test_add_lock_write_failure_rolls_back_config(tmp_path: Path) -> None:
+    import yaml as _yaml
+
+    spec = _make_manifest_spec()
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("skills: []\n", encoding="utf-8")
+    with (
+        patch(
+            "nimble.manifest.parser.fetch_remote_manifest",
+            return_value=spec,
+        ),
+        patch("nimble.cli.commands._repo_root", return_value=tmp_path),
+        patch("nimble.manifest.installer.clone_skill_repo"),
+        patch("nimble.manifest.installer.install_skill_venv"),
+        patch(
+            "nimble.manifest.lock.write_lock_entry",
+            side_effect=OSError("disk full"),
+        ),
+    ):
+        result = runner.invoke(
+            app, ["add", "ctrl+shift+d", "github.com/user/skill"], input="y\n"
+        )
+    assert result.exit_code == 1
+    assert "manifest.lock" in result.output
+    assert "removed from config.yaml" in result.output
+    data = _yaml.safe_load(cfg.read_text(encoding="utf-8"))
+    assert data["skills"] == []
 
 
 def test_terminate_windows_openprocess_failure_raises() -> None:
