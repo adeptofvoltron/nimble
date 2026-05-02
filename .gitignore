@@ -15,3 +15,6 @@ dist/
 build/
 .venv/
 *.egg
+
+skills/*
+!skills/hello_world
