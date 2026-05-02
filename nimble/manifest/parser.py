@@ -140,6 +140,77 @@ def disable_skill_in_config(config_path: Path, skill_name: str) -> None:
     raise ValueError(f"No skill named '{skill_name}' found in config.yaml")
 
 
+def append_skill_to_config(
+    config_path: Path,
+    spec: ManifestSpec,
+    binding: str,
+    repo_url: str,
+    repo_root: Path,
+) -> None:
+    if not (spec.class_name or "").strip():
+        raise ConfigError(
+            "manifest.yaml must declare 'class_name' for community skill installation"
+        )
+    try:
+        with config_path.open(encoding="utf-8") as f:
+            raw = yaml.safe_load(f)
+    except (OSError, yaml.YAMLError) as exc:
+        raise ConfigError(f"Failed to read config.yaml: {exc}") from exc
+
+    if raw is None:
+        raw = {}
+
+    skills = raw.get("skills", [])
+    if not isinstance(skills, list):
+        raise ConfigError("config.yaml 'skills' must be a list")
+
+    rel_path = str(Path(".nimble") / "skills" / spec.name / spec.entrypoint)
+    entry: dict[str, Any] = {
+        "name": spec.name,
+        "source": "community",
+        "path": rel_path,
+        "class_name": spec.class_name,
+        "binding": binding,
+        "installed_from": repo_url,
+        "version": spec.version,
+    }
+    skills.append(entry)
+    raw["skills"] = skills
+    atomic_write(
+        config_path, yaml.dump(raw, default_flow_style=False, allow_unicode=True)
+    )
+
+
+def remove_skill_entry_from_config(config_path: Path, skill_name: str) -> None:
+    """Remove the last skills[] entry whose name matches (rollback helper)."""
+    try:
+        with config_path.open(encoding="utf-8") as f:
+            raw = yaml.safe_load(f)
+    except (OSError, yaml.YAMLError) as exc:
+        raise ConfigError(f"Failed to read config.yaml: {exc}") from exc
+
+    if raw is None:
+        raise ConfigError("Rollback failed: config.yaml is empty")
+
+    skills = raw.get("skills", [])
+    if not isinstance(skills, list):
+        raise ConfigError("Rollback failed: config.yaml 'skills' is not a list")
+
+    for i in range(len(skills) - 1, -1, -1):
+        entry = skills[i]
+        if isinstance(entry, dict) and entry.get("name") == skill_name:
+            del skills[i]
+            atomic_write(
+                config_path,
+                yaml.dump(raw, default_flow_style=False, allow_unicode=True),
+            )
+            return
+
+    raise ConfigError(
+        f"Rollback failed: no skill named {skill_name!r} found in config.yaml"
+    )
+
+
 def read_skill_manifest(config: SkillConfig, base_path: Path) -> dict[str, Any] | None:
     base_root = base_path.resolve()
     skill_path = Path(config.path)

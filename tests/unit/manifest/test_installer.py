@@ -9,6 +9,7 @@ import pytest
 from nimble.manifest.installer import (
     InstallError,
     check_dependency_conflicts,
+    clone_skill_repo,
     install_skill_venv,
 )
 from nimble.manifest.parser import ManifestSpec
@@ -176,3 +177,31 @@ def test_new_install_still_cleaned_up_on_failure(tmp_path: Path) -> None:
         with pytest.raises(InstallError):
             install_skill_venv(_make_spec(dependencies=[]), tmp_path)
     assert not skill_dir.exists()
+
+
+# ---------------------------------------------------------------------------
+# clone_skill_repo tests
+# ---------------------------------------------------------------------------
+
+
+def test_clone_skill_repo_success(tmp_path: Path) -> None:
+    skill_dir = tmp_path / "skill"
+    with patch(
+        "subprocess.run", return_value=MagicMock(returncode=0, stderr="")
+    ) as mock:
+        clone_skill_repo("https://github.com/u/skill", skill_dir)
+    args = mock.call_args[0][0]
+    assert args[0] == "git"
+    assert "--depth=1" in args
+    assert "https://github.com/u/skill" in args
+    assert str(skill_dir) in args
+
+
+def test_clone_skill_repo_failure(tmp_path: Path) -> None:
+    skill_dir = tmp_path / "skill"
+    with patch(
+        "subprocess.run",
+        return_value=MagicMock(returncode=1, stderr="fatal: repo not found"),
+    ):
+        with pytest.raises(InstallError, match="Failed to clone"):
+            clone_skill_repo("https://github.com/u/missing", skill_dir)

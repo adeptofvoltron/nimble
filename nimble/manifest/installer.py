@@ -19,6 +19,19 @@ def _venv_pip(venv_path: Path) -> Path:
     return venv_path / "bin" / "pip"
 
 
+def clone_skill_repo(repo_url: str, skill_dir: Path) -> None:
+    try:
+        result = subprocess.run(
+            ["git", "clone", "--depth=1", repo_url, str(skill_dir)],
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        raise InstallError("'git' not found — install git to use 'nimble add'")
+    if result.returncode != 0:
+        raise InstallError(f"Failed to clone {repo_url}:\n{result.stderr.strip()}")
+
+
 def check_dependency_conflicts(spec: ManifestSpec, repo_root: Path) -> None:
     """Pre-flight dry-run: detect conflicts in an existing venv."""
     venv_path = repo_root / ".nimble" / "skills" / spec.name / ".venv"
