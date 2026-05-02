@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: code review of 7-1-skill-build-md-ai-authoring-contract.md (2026-05-02)
+
+- `nimble/skills/installer.py` vs `nimble/skills/runner.py`: Community-skill venv path mismatch reported by Edge Case Hunter — installer writes to `repo_root/.nimble/skills/<n>/.venv` while runner reads from `Path.home()/.nimble/skills/<n>/.venv`. If confirmed, community skills install to one venv and run from another; pre-existing across Epic 6. Verify and address in a follow-up story (out of scope for doc-only Story 7.1).
+- `nimble/skills/runner.py`: `api_version` refusal logic only enforces version check when `type(skill_api_version) is int`; non-int values (e.g. floats truncated by parser, or other coercions) bypass the check. Pre-existing in runner; harden in a parser/runner reliability pass.
+- `worker/entrypoint.py:198-201`: `on_error` exceptions are silently swallowed (`except Exception: logger.warning(...)`). Story 7.1 doc patch will reflect current behaviour (re-raise has no effect). If we want true re-raise / exception-replacement semantics, the runner needs a small redesign — capture for a future epic.
+
 ## Deferred from: code review of 5-3-nimble-disable.md (2026-05-01)
 
 - `nimble/manifest/parser.py:50`: `disable_skill_in_config` disables only the first matching skill name; duplicate skill names are a pre-existing config integrity gap and make disable semantics ambiguous until uniqueness is enforced.
