@@ -1,0 +1,29 @@
+[Unit]
+Description=Nimble cross-platform hotkey daemon
+# Nimble requires a graphical session for X11 hotkey capture.
+# Start after the graphical session is established.
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+# ────────────────────────────────────────────────────────
+# SETUP REQUIRED: Replace both placeholder paths below.
+#
+#   <NIMBLE_BIN>   — absolute path to the nimble CLI binary.
+#                    Find it with: which nimble
+#                    Typical: /home/<user>/.local/bin/nimble
+#
+#   <REPO_ROOT>    — absolute path to the directory containing
+#                    your config.yaml (your Nimble project root).
+#                    Example: /home/<user>/projects/pixi
+#
+#   Paths with spaces: wrap each substituted path in double quotes on the
+#   ExecStart= line (e.g. ExecStart="/opt/my app/nimble" _run "/home/u/my repo").
+# ────────────────────────────────────────────────────────
+ExecStart=<NIMBLE_BIN> _run <REPO_ROOT>
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

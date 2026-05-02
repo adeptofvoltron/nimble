@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>Nimble cross-platform hotkey daemon — starts at login</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <!-- Task runs as the current user — no elevated privileges (NFR6) -->
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <!-- No execution time limit — daemon runs indefinitely -->
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <!-- Restart up to 3 times at 1-minute intervals on failure (NFR12) -->
+    <RestartOnFailure>
+      <Interval>PT1M</Interval>
+      <Count>3</Count>
+    </RestartOnFailure>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <!--
+        SETUP REQUIRED: Replace both placeholder paths below.
+
+          <NIMBLE_BIN>  — full path to nimble.exe
+                          Find it with: where nimble
+                          Typical: C:\Users\<user>\AppData\Local\Programs\Python\Python312\Scripts\nimble.exe
+
+          <REPO_ROOT>   — full path to the directory containing config.yaml
+                          Example: C:\Users\<user>\projects\pixi
+
+        If a path contains spaces, quote it in <Command>, <Arguments>, and <WorkingDirectory>.
+        In XML element text, escape & as &amp;.
+      -->
+      <Command><NIMBLE_BIN></Command>
+      <Arguments>_run <REPO_ROOT></Arguments>
+      <WorkingDirectory><REPO_ROOT></WorkingDirectory>
+    </Exec>
+  </Actions>
+</Task>
