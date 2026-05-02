@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-16"
-last_updated: "2026-05-02"  # updated by code-review for 7.2
+last_updated: "2026-05-02"  # updated by code-review for 7.3
 project: "pixi (Nimble)"
 project_key: NOKEY
 tracking_system: file-system
@@ -102,5 +102,5 @@ development_status:
   epic-7: in-progress
   7-1-skill-build-md-ai-authoring-contract: done
   7-2-autostart-configuration-systemd-windows-task-scheduler: done
-  7-3-readme-security-model-and-inline-skill-example: backlog
+  7-3-readme-security-model-and-inline-skill-example: done
   epic-7-retrospective: optional
