@@ -6,7 +6,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nimble.manifest.installer import InstallError, install_skill_venv
+from nimble.manifest.installer import (
+    InstallError,
+    check_dependency_conflicts,
+    install_skill_venv,
+)
 from nimble.manifest.parser import ManifestSpec
 
 
@@ -98,3 +102,77 @@ def test_pip_failure_cleans_up_skill_dir(tmp_path: Path) -> None:
         with pytest.raises(InstallError):
             install_skill_venv(_make_spec(), tmp_path)
     assert not (tmp_path / ".nimble" / "skills" / "test-skill").exists()
+
+
+# ---------------------------------------------------------------------------
+# check_dependency_conflicts tests
+# ---------------------------------------------------------------------------
+
+
+def test_conflict_check_skipped_when_no_venv(tmp_path: Path) -> None:
+    with patch("subprocess.run") as mock:
+        check_dependency_conflicts(_make_spec(), tmp_path)
+    assert mock.call_count == 0
+
+
+def test_conflict_check_skipped_when_no_deps(tmp_path: Path) -> None:
+    (tmp_path / ".nimble" / "skills" / "test-skill" / ".venv").mkdir(parents=True)
+    with patch("subprocess.run") as mock:
+        check_dependency_conflicts(_make_spec(dependencies=[]), tmp_path)
+    assert mock.call_count == 0
+
+
+def test_conflict_raises_install_error(tmp_path: Path) -> None:
+    (tmp_path / ".nimble" / "skills" / "test-skill" / ".venv").mkdir(parents=True)
+    with patch(
+        "subprocess.run",
+        return_value=MagicMock(
+            returncode=1, stderr="ERROR: pip's dependency resolver", stdout=""
+        ),
+    ):
+        with pytest.raises(InstallError, match="Dependency conflict detected"):
+            check_dependency_conflicts(_make_spec(), tmp_path)
+
+
+def test_conflict_message_falls_back_to_stdout(tmp_path: Path) -> None:
+    (tmp_path / ".nimble" / "skills" / "test-skill" / ".venv").mkdir(parents=True)
+    with patch(
+        "subprocess.run",
+        return_value=MagicMock(returncode=1, stderr="", stdout="conflict info"),
+    ):
+        with pytest.raises(InstallError, match="conflict info"):
+            check_dependency_conflicts(_make_spec(), tmp_path)
+
+
+def test_no_conflict_does_not_raise(tmp_path: Path) -> None:
+    (tmp_path / ".nimble" / "skills" / "test-skill" / ".venv").mkdir(parents=True)
+    with patch(
+        "subprocess.run",
+        return_value=MagicMock(returncode=0, stderr="", stdout=""),
+    ):
+        check_dependency_conflicts(_make_spec(), tmp_path)
+
+
+def test_existing_venv_preserved_on_pip_failure(tmp_path: Path) -> None:
+    skill_dir = tmp_path / ".nimble" / "skills" / "test-skill"
+    (skill_dir / ".venv").mkdir(parents=True)
+    side_effects = [
+        MagicMock(returncode=0, stderr=""),
+        MagicMock(returncode=1, stderr="pip install failed"),
+    ]
+    with patch("subprocess.run", side_effect=side_effects):
+        with patch("nimble.manifest.installer.check_dependency_conflicts"):
+            with pytest.raises(InstallError):
+                install_skill_venv(_make_spec(), tmp_path)
+    assert skill_dir.exists()
+
+
+def test_new_install_still_cleaned_up_on_failure(tmp_path: Path) -> None:
+    skill_dir = tmp_path / ".nimble" / "skills" / "test-skill"
+    with patch(
+        "subprocess.run",
+        return_value=MagicMock(returncode=1, stderr="venv error"),
+    ):
+        with pytest.raises(InstallError):
+            install_skill_venv(_make_spec(dependencies=[]), tmp_path)
+    assert not skill_dir.exists()

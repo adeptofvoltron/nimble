@@ -94,7 +94,7 @@ development_status:
   6-1-manifest-yaml-parsing-and-validation: done
   6-2-permissions-display-and-install-confirmation: done
   6-3-per-skill-venv-creation-and-dependency-installation: done
-  6-4-dependency-conflict-detection: backlog
+  6-4-dependency-conflict-detection: done
   6-5-config-append-manifest-lock-and-nimble-skills-structure: backlog
   epic-6-retrospective: optional
 
