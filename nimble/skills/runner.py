@@ -15,7 +15,6 @@ from typing import Any, Literal
 from nimble import SUPPORTED_API_VERSION
 from nimble.logging_setup import LOG_PATH
 from nimble.manifest.parser import AiConfig, read_skill_manifest
-from nimble.platform import is_windows
 from nimble.skills.registry import SkillConfig, SkillRegistry, SkillWorker
 
 logger = logging.getLogger(__name__)
@@ -52,12 +51,13 @@ class DispatchResult:
 
 
 def _get_python_executable(config: SkillConfig) -> str:
-    if config.source == "local":
-        return sys.executable
-    base = Path.home() / ".nimble" / "skills" / config.name / ".venv"
-    if is_windows():
-        return str(base / "Scripts" / "python.exe")
-    return str(base / "bin" / "python")
+    return sys.executable
+
+
+def _get_community_venv_path(config: SkillConfig, repo_root: Path) -> str:
+    if config.source != "community":
+        return ""
+    return str(repo_root / ".nimble" / "skills" / config.name / ".venv")
 
 
 class SkillRunner:
@@ -147,6 +147,9 @@ class SkillRunner:
                         "NIMBLE_LOG_PATH": str(LOG_PATH),
                         "NIMBLE_DEBUG": "1" if self._debug else "0",
                         "NIMBLE_SKILL_CONFIG": skill_config_json,
+                        "NIMBLE_VENV_PATH": _get_community_venv_path(
+                            config, self._repo_root
+                        ),
                     },
                 )
                 handshake_line = _readline_with_timeout(

@@ -63,7 +63,7 @@ def test_spawn_workers_local_uses_sys_executable() -> None:
         assert cmd[0] == sys.executable
 
 
-def test_spawn_workers_community_uses_venv_python() -> None:
+def test_spawn_workers_community_uses_sys_executable_and_sets_venv_path() -> None:
     config = _make_config(name="my-skill", source="community")
     registry = SkillRegistry()
     runner = _make_runner(registry=registry)
@@ -73,16 +73,13 @@ def test_spawn_workers_community_uses_venv_python() -> None:
 
     with patch("subprocess.Popen", return_value=fake_proc) as mock_popen:
         runner.spawn_workers([config])
-        args, _ = mock_popen.call_args
+        args, kwargs = mock_popen.call_args
         cmd = args[0]
-        if sys.platform == "win32":
-            assert cmd[0].endswith("python.exe")
-            assert "Scripts" in cmd[0]
-        else:
-            assert cmd[0].endswith("python")
-            assert "bin" in cmd[0]
-        assert ".nimble" in cmd[0]
-        assert "my-skill" in cmd[0]
+        assert cmd[0] == sys.executable
+        env = kwargs.get("env", {})
+        venv_path = env.get("NIMBLE_VENV_PATH", "")
+        assert ".nimble" in venv_path
+        assert "my-skill" in venv_path
 
 
 def test_spawn_workers_registers_worker() -> None:
