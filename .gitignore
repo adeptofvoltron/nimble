@@ -16,5 +16,4 @@ build/
 .venv/
 *.egg
 
-skills/*
-!skills/hello_world
+.nimble

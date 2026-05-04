@@ -11,6 +11,18 @@ _env_root = os.environ.get("NIMBLE_REPO_ROOT")
 if _env_root and _env_root not in sys.path:
     sys.path.append(_env_root)
 
+_venv_path = os.environ.get("NIMBLE_VENV_PATH")
+if _venv_path:
+    import glob as _glob
+
+    for _pat in [
+        str(Path(_venv_path) / "lib" / "python*" / "site-packages"),  # Linux/macOS
+        str(Path(_venv_path) / "Lib" / "site-packages"),               # Windows
+    ]:
+        for _sp in _glob.glob(_pat):
+            if _sp not in sys.path:
+                sys.path.insert(1, _sp)
+
 _log_path = os.environ.get("NIMBLE_LOG_PATH")
 if _log_path:
     _handler = logging.FileHandler(_log_path)
