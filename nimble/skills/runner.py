@@ -134,7 +134,7 @@ class SkillRunner:
                     [
                         python_executable,
                         str(self._repo_root / "worker" / "entrypoint.py"),
-                        config.path,
+                        str(self._repo_root / config.path),
                         config.class_name,
                     ],
                     stdin=subprocess.PIPE,

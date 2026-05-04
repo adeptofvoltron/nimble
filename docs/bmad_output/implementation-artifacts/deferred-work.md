@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: spec-fix-skill-module-path-absolute (2026-05-04)
+
+- `nimble/skills/runner.py:137` + `nimble/skills/loader.py` (`validate_skill_paths`): both use `repo_root / config.path` without guarding against absolute paths or `..` traversal in `config.path`. Config is currently trusted, but worth hardening in a validation pass (e.g. assert path is relative and stays within repo_root after `.resolve()`).
+
 ## Deferred from: spec-fix-community-skill-worker-loading (2026-05-04)
 
 - `worker/entrypoint.py` — glob-based venv injection may match multiple `python3.x` dirs on unusual shared venv layouts; import resolution order between them is non-deterministic. Extremely unlikely in practice; address in a venv-hardening pass if reported.
