@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-04-16"
-last_updated: "2026-05-02"  # updated by code-review for 7.3
+last_updated: "2026-05-04"  # updated by correct-course: added Epic 8 skill configuration
 project: "pixi (Nimble)"
 project_key: NOKEY
 tracking_system: file-system
@@ -104,3 +104,10 @@ development_status:
   7-2-autostart-configuration-systemd-windows-task-scheduler: done
   7-3-readme-security-model-and-inline-skill-example: done
   epic-7-retrospective: optional
+
+  # Epic 8: Skill Configuration — Pass Parameters from config.yaml to Skills
+  epic-8: backlog
+  8-1-config-fields-schema-in-manifest-yaml-and-parsing: backlog
+  8-2-configuration-in-config-yaml-and-worker-injection: backlog
+  8-3-interactive-config-prompting-in-nimble-add: backlog
+  epic-8-retrospective: optional

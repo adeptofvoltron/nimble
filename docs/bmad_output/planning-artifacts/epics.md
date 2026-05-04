@@ -158,6 +158,9 @@ FR42: Epic 2 — `skills/` author-owned directory
 FR43: Epic 6 — `.nimble/skills/` tool-managed directory
 FR44: Epic 7 — `skill-build.md` AI authoring contract
 FR45: Epic 2 — Bundled test hotkey
+FR46: Epic 8 — `config_fields` declaration in `manifest.yaml`
+FR47: Epic 8 — `configuration` key-value block in `config.yaml` injected as `self.configuration` in skill
+FR48: Epic 8 — `nimble add` prompts user for each declared config field at install time
 
 ## Epic List
 
@@ -188,6 +191,10 @@ Users can run `nimble add <shortcut> <repo-url>`, review declared permissions, a
 ### Epic 7: Launch-Ready — Developer Experience & Ecosystem Artifacts
 The template ships with `skill-build.md` (AI authoring contract), a working README with inline skill example, autostart files for both platforms, and a documented security model — everything needed to share the project publicly.
 **FRs covered:** FR12, FR44
+
+### Epic 8: Skill Configuration — Pass Parameters from `config.yaml` to Skills
+Skills can declare named configuration fields in `manifest.yaml`; users set values in `config.yaml`; `nimble add` prompts interactively at install time; values are injected as `self.configuration` on the skill instance, accessible in both `on_load` and `run()`.
+**FRs covered:** FR46, FR47, FR48
 
 ---
 
@@ -1110,3 +1117,109 @@ So that I can start using Nimble immediately and trust what I'm running.
 **Given** the README links to `.ai/skill-build.md`
 **When** a builder wants to write their first skill
 **Then** `skill-build.md` is discoverable from the README as the starting point for skill authoring (FR44)
+
+---
+
+## Epic 8: Skill Configuration — Pass Parameters from `config.yaml` to Skills
+
+Skills can declare named configuration fields in `manifest.yaml`; users set values in `config.yaml`; `nimble add` prompts interactively at install time; values are injected as `self.configuration` on the skill instance, accessible in both `on_load` and `run()`.
+
+### Story 8.1: `config_fields` Schema in `manifest.yaml` and Parsing
+
+As a skill author,
+I want to declare named configuration fields in my `manifest.yaml` with descriptions, optional defaults, and optional value constraints,
+So that users and `nimble add` know exactly what to provide when installing or configuring my skill.
+
+**Acceptance Criteria:**
+
+**Given** a `manifest.yaml` with a `config_fields` block containing a field with `key`, `description`, and `default`
+**When** `parse_manifest_yaml()` parses it
+**Then** it returns a `ManifestSpec` with a populated `config_fields: list[ConfigFieldSpec]` containing the correct values
+
+**Given** a `config_fields` entry with `possible_values: [en, es, fr]` and `default: en`
+**When** parsed
+**Then** `ConfigFieldSpec.possible_values == ["en", "es", "fr"]` and `ConfigFieldSpec.default == "en"`
+
+**Given** a `config_fields` entry with no `possible_values`
+**When** parsed
+**Then** `ConfigFieldSpec.possible_values is None` — the field accepts any string value
+
+**Given** a `manifest.yaml` with no `config_fields` key
+**When** parsed
+**Then** `ManifestSpec.config_fields == []` — absence is not an error
+
+**Given** a `config_fields` entry missing the required `key` or `description` field
+**When** parsed
+**Then** a `ManifestError` is raised identifying the missing field — install is aborted
+
+---
+
+### Story 8.2: `configuration` in `config.yaml` + Worker Injection
+
+As a skill author,
+I want my skill to receive user-defined configuration values as `self.configuration` in both `on_load` and `run()`,
+So that I can parameterise my skill's behaviour without hardcoding values or prompting the user on every invocation.
+
+**Acceptance Criteria:**
+
+**Given** a skill entry in `config.yaml` with a `configuration: {target_language: es}` block
+**When** `_parse_skills()` parses it
+**Then** the resulting `SkillConfig.configuration == {"target_language": "es"}`
+
+**Given** a skill entry with no `configuration` key
+**When** parsed
+**Then** `SkillConfig.configuration == {}` — absence is not an error
+
+**Given** a `SkillConfig` with a non-empty `configuration` dict
+**When** `runner.py` builds `skill_config_json`
+**Then** it includes `"configuration": {"target_language": "es"}` in the JSON payload
+
+**Given** the worker subprocess starts and `NIMBLE_SKILL_CONFIG` contains `"configuration": {...}`
+**When** the worker initialises the skill instance
+**Then** `skill.configuration` is set to the dict before `on_load` is called
+
+**Given** a skill's `run()` method accesses `self.configuration["target_language"]`
+**When** `run()` is called
+**Then** it returns the value from `config.yaml` — `self.configuration` is available without `on_load` being defined
+
+**Given** a skill with no `configuration` in `config.yaml`
+**When** `self.configuration` is accessed
+**Then** it returns `{}` — never raises `AttributeError`
+
+**Given** an existing skill that defines `on_load(self, config)` and reads `config["name"]`
+**When** the worker calls `on_load`
+**Then** `config["name"]` still works — the `configuration` key is additive, not replacing existing keys
+
+---
+
+### Story 8.3: Interactive Config Prompting in `nimble add`
+
+As a user installing a community skill,
+I want to be prompted for each declared configuration field during `nimble add`,
+So that my `config.yaml` is fully populated with skill parameters without any manual editing.
+
+**Acceptance Criteria:**
+
+**Given** a skill's `ManifestSpec.config_fields` contains one field with `key: target_language`, `description: "Target language code"`, `default: "en"`, `possible_values: [en, es, fr]`
+**When** `nimble add` runs after the user confirms install
+**Then** the CLI prompts: `target_language — Target language code [en/es/fr] (default: 'en'):`
+
+**Given** the user presses Enter without typing a value and a default exists
+**When** the prompt is processed
+**Then** the default value is used — the user is not re-prompted
+
+**Given** the user enters a value not in `possible_values`
+**When** the prompt is processed
+**Then** the CLI prints an error and re-prompts until a valid value is entered
+
+**Given** a field with no `default` and no `possible_values`
+**When** the user presses Enter without typing
+**Then** the CLI prints `'<key>' is required.` and re-prompts until a non-empty value is entered
+
+**Given** all config fields have been collected
+**When** `append_skill_to_config()` writes the skill entry
+**Then** the entry includes a `configuration:` block with all collected key-value pairs
+
+**Given** a skill's `ManifestSpec.config_fields` is empty
+**When** `nimble add` runs
+**Then** no configuration prompts appear and no `configuration:` block is written to `config.yaml`
