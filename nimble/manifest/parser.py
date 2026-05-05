@@ -96,7 +96,9 @@ def _parse_manifest_string_list(
     return raw
 
 
-def _require_non_empty_str(entry: dict, field_name: str, i: int, source: str) -> str:
+def _require_non_empty_str(
+    entry: dict[str, Any], field_name: str, i: int, source: str
+) -> str:
     if field_name not in entry:
         raise ManifestError(
             f"manifest.yaml from {source} config_fields[{i}]"
@@ -111,7 +113,9 @@ def _require_non_empty_str(entry: dict, field_name: str, i: int, source: str) ->
     return value
 
 
-def _parse_config_field_default(entry: dict, i: int, source: str) -> str | None:
+def _parse_config_field_default(
+    entry: dict[str, Any], i: int, source: str
+) -> str | None:
     if "default" not in entry:
         return None
     raw = entry["default"]
@@ -124,7 +128,7 @@ def _parse_config_field_default(entry: dict, i: int, source: str) -> str | None:
 
 
 def _parse_config_field_possible_values(
-    entry: dict, i: int, source: str
+    entry: dict[str, Any], i: int, source: str
 ) -> list[str] | None:
     raw = entry.get("possible_values")
     if raw is None:
@@ -146,7 +150,11 @@ def _parse_config_field_entry(entry: Any, i: int, source: str) -> ConfigFieldSpe
     description = _require_non_empty_str(entry, "description", i, source)
     default = _parse_config_field_default(entry, i, source)
     possible_values = _parse_config_field_possible_values(entry, i, source)
-    if default is not None and possible_values is not None and default not in possible_values:
+    if (
+        default is not None
+        and possible_values is not None
+        and default not in possible_values
+    ):
         raise ManifestError(
             f"manifest.yaml from {source} config_fields[{i}]"
             " field 'default' must be one of 'possible_values'"
