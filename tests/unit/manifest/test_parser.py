@@ -754,7 +754,8 @@ def test_parse_manifest_config_fields_possible_values_items_must_be_strings() ->
         "      - en\n"
         "      - 2\n"
     )
-    with pytest.raises(ManifestError, match="'possible_values' must be a list of strings"):
+    match = "'possible_values' must be a list of strings"
+    with pytest.raises(ManifestError, match=match):
         parse_manifest_yaml(content)
 
 
