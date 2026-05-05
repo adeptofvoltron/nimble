@@ -169,6 +169,12 @@ def run(module_path: str, class_name: str) -> None:
         sys.stdout.flush()
         return
 
+    configuration: dict[str, str] = {}
+    raw_cfg = skill_config.get("configuration")
+    if isinstance(raw_cfg, dict):
+        configuration = {str(k): str(v) for k, v in raw_cfg.items()}
+    skill.configuration = configuration
+
     if hasattr(skill, "on_load"):
         try:
             skill.on_load(skill_config)

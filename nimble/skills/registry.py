@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 logger = logging.getLogger(__name__)
@@ -18,6 +18,7 @@ class SkillConfig:
     binding: str
     path: str
     class_name: str
+    configuration: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass

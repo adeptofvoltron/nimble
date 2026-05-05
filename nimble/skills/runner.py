@@ -128,6 +128,7 @@ class SkillRunner:
                         "binding": config.binding,
                         "path": config.path,
                         "class_name": config.class_name,
+                        "configuration": config.configuration,
                     }
                 )
                 proc = subprocess.Popen(
