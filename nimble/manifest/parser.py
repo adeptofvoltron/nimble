@@ -96,6 +96,69 @@ def _parse_manifest_string_list(
     return raw
 
 
+def _require_non_empty_str(entry: dict, field_name: str, i: int, source: str) -> str:
+    if field_name not in entry:
+        raise ManifestError(
+            f"manifest.yaml from {source} config_fields[{i}]"
+            f" missing required field '{field_name}'"
+        )
+    value = entry[field_name]
+    if not isinstance(value, str) or not value.strip():
+        raise ManifestError(
+            f"manifest.yaml from {source} config_fields[{i}]"
+            f" field '{field_name}' must be a non-empty string"
+        )
+    return value
+
+
+def _parse_config_field_default(entry: dict, i: int, source: str) -> str | None:
+    if "default" not in entry:
+        return None
+    raw = entry["default"]
+    if raw is None or isinstance(raw, str):
+        return raw
+    raise ManifestError(
+        f"manifest.yaml from {source} config_fields[{i}]"
+        " field 'default' must be a string or null"
+    )
+
+
+def _parse_config_field_possible_values(
+    entry: dict, i: int, source: str
+) -> list[str] | None:
+    raw = entry.get("possible_values")
+    if raw is None:
+        return None
+    if not isinstance(raw, list) or any(not isinstance(v, str) for v in raw):
+        raise ManifestError(
+            f"manifest.yaml from {source} config_fields[{i}]"
+            " 'possible_values' must be a list of strings"
+        )
+    return raw
+
+
+def _parse_config_field_entry(entry: Any, i: int, source: str) -> ConfigFieldSpec:
+    if not isinstance(entry, dict):
+        raise ManifestError(
+            f"manifest.yaml from {source} config_fields[{i}] must be a mapping"
+        )
+    key = _require_non_empty_str(entry, "key", i, source)
+    description = _require_non_empty_str(entry, "description", i, source)
+    default = _parse_config_field_default(entry, i, source)
+    possible_values = _parse_config_field_possible_values(entry, i, source)
+    if default is not None and possible_values is not None and default not in possible_values:
+        raise ManifestError(
+            f"manifest.yaml from {source} config_fields[{i}]"
+            " field 'default' must be one of 'possible_values'"
+        )
+    return ConfigFieldSpec(
+        key=key,
+        description=description,
+        default=default,
+        possible_values=possible_values,
+    )
+
+
 def _parse_config_fields(data: dict[str, Any], source: str) -> list[ConfigFieldSpec]:
     raw = data.get("config_fields")
     if raw is None:
@@ -104,69 +167,7 @@ def _parse_config_fields(data: dict[str, Any], source: str) -> list[ConfigFieldS
         raise ManifestError(
             f"manifest.yaml from {source} field 'config_fields' must be a list"
         )
-    result: list[ConfigFieldSpec] = []
-    for i, entry in enumerate(raw):
-        if not isinstance(entry, dict):
-            raise ManifestError(
-                f"manifest.yaml from {source} config_fields[{i}] must be a mapping"
-            )
-        for required in ("key", "description"):
-            if required not in entry:
-                raise ManifestError(
-                    f"manifest.yaml from {source} config_fields[{i}]"
-                    f" missing required field '{required}'"
-                )
-        key = entry["key"]
-        if not isinstance(key, str) or not key.strip():
-            raise ManifestError(
-                f"manifest.yaml from {source} config_fields[{i}]"
-                " field 'key' must be a non-empty string"
-            )
-        description = entry["description"]
-        if not isinstance(description, str) or not description.strip():
-            raise ManifestError(
-                f"manifest.yaml from {source} config_fields[{i}]"
-                " field 'description' must be a non-empty string"
-            )
-        default: str | None = None
-        if "default" in entry:
-            raw_default = entry["default"]
-            if raw_default is None:
-                default = None
-            elif isinstance(raw_default, str):
-                default = raw_default
-            else:
-                raise ManifestError(
-                    f"manifest.yaml from {source} config_fields[{i}]"
-                    " field 'default' must be a string or null"
-                )
-        raw_pv = entry.get("possible_values")
-        if raw_pv is None:
-            possible_values = None
-        elif not isinstance(raw_pv, list) or any(
-            not isinstance(v, str) for v in raw_pv
-        ):
-            raise ManifestError(
-                f"manifest.yaml from {source} config_fields[{i}]"
-                " 'possible_values' must be a list of strings"
-            )
-        else:
-            possible_values = raw_pv
-        if default is not None and possible_values is not None:
-            if default not in possible_values:
-                raise ManifestError(
-                    f"manifest.yaml from {source} config_fields[{i}]"
-                    " field 'default' must be one of 'possible_values'"
-                )
-        result.append(
-            ConfigFieldSpec(
-                key=key,
-                description=description,
-                default=default,
-                possible_values=possible_values,
-            )
-        )
-    return result
+    return [_parse_config_field_entry(entry, i, source) for i, entry in enumerate(raw)]
 
 
 @dataclass
