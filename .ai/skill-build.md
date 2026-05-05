@@ -38,6 +38,14 @@ def on_unload(self):
     pass
 ```
 
+**Auto-injected attribute — always present, never `None`:**
+
+```python
+self.configuration  # dict[str, str] — values from the configuration: block in config.yaml
+```
+
+The daemon sets `self.configuration` on every skill instance **before** calling `on_load`. It is available in `on_load`, `run()`, `on_error()`, and `on_unload()`. Defaults to `{}` when no `configuration:` block exists in `config.yaml`. See Section 6 for the full configuration workflow.
+
 **Minimal skeleton (start here):**
 
 ```python
@@ -150,7 +158,14 @@ class_name: MySkill          # str — class name inside entrypoint. Required fo
                              # is used at runtime).
 requires: []                 # list[str] — reserved for future inter-skill dependencies; parsed but not
                              # currently enforced by the daemon. Safe to omit.
+config_fields:               # list — declares user-configurable parameters; see Section 6
+  - key: target_language     # str (required) — YAML key written into the configuration: block
+    description: "Target language code"  # str (required) — prompt label shown during nimble add
+    default: "en"            # str or null (optional) — used when user presses Enter; must be in possible_values
+    possible_values: [en, es, fr]  # list[str] (optional) — constrains valid input; free-text if absent
 ```
+
+A `ManifestError` is raised in the following cases: `config_fields` is present but not a list; any entry is not a YAML mapping; an entry is missing `key` or `description`; `default` is set to a non-string, non-null value; `default` is not in `possible_values` when both are set; or `possible_values` contains non-string items. Absence of `config_fields` is not an error — `ManifestSpec.config_fields` defaults to `[]`.
 
 **`permissions` values** (shown to users before community-skill install):
 
@@ -164,7 +179,7 @@ requires: []                 # list[str] — reserved for future inter-skill dep
 
 **`dependencies`** — pip package names for `nimble add` install. Example: `[anthropic, requests]`
 
-**`api_version`** — must be ≤ `SUPPORTED_API_VERSION` in `nimble/__init__.py` (currently `1`). The daemon refuses skills whose `api_version` exceeds `SUPPORTED_API_VERSION`; skills targeting an earlier version load with a deprecation warning. Increment on every breaking interface change (see Section 8).
+**`api_version`** — must be ≤ `SUPPORTED_API_VERSION` in `nimble/__init__.py` (currently `1`). The daemon refuses skills whose `api_version` exceeds `SUPPORTED_API_VERSION`; skills targeting an earlier version load with a deprecation warning. Increment on every breaking interface change (see Section 9).
 
 ---
 
@@ -180,6 +195,8 @@ skills:
     class_name: MySkill                   # class name inside skill.py
     binding: "ctrl+shift+m"               # hotkey — pynput format, case-insensitive
     disabled: false                        # optional — set true to skip-load this skill (set by `nimble disable`)
+    configuration:                         # optional — key-value pairs injected as self.configuration; see Section 6
+      target_language: es                  # all values stored and delivered as strings
 
 ai:
   provider: anthropic                     # anthropic | openai
@@ -197,7 +214,82 @@ ai:
 
 ---
 
-## 6. Complete Working Example
+## 6. Skill Custom Configuration
+
+Skills can declare named configuration parameters in `manifest.yaml` (`config_fields`). When installed via `nimble add`, the user is prompted for each field interactively; the collected values are written into the `configuration:` block in `config.yaml`. The daemon then injects those values as `self.configuration` (`dict[str, str]`) before `on_load` is called.
+
+### Step 1 — Declare fields in `manifest.yaml`
+
+```yaml
+config_fields:
+  - key: target_language
+    description: "Target language code"
+    default: "en"
+    possible_values: [en, es, fr]
+  - key: api_key
+    description: "External API key"    # no default → user must enter a value; no possible_values → free-text
+```
+
+### Step 2 — What `nimble add` does
+
+After the user confirms install, `nimble add` prompts for each `config_fields` entry in order:
+
+```
+target_language — Target language code [en/es/fr] (default: 'en'): es
+api_key — External API key: sk-abc123
+```
+
+Prompt rules:
+- `[v1/v2/...]` is shown only when `possible_values` is set.
+- `(default: 'X')` is shown only when `default` is set. Pressing Enter uses the default.
+- When there is no `default`, pressing Enter prints `'<key>' is required.` and re-prompts.
+- An invalid value (not in `possible_values`) prints `Invalid value. Choose from: ...` and re-prompts.
+- Input is stripped of leading/trailing whitespace before validation. `" es "` is treated as `"es"`.
+- If stdin is closed (EOF) or a read error occurs, the CLI prints an error to stderr and exits with code 1.
+
+The `configuration:` block is written only when at least one field was prompted (i.e. `config_fields` is non-empty). Skills with no `config_fields` produce no block.
+
+### Step 3 — The `configuration:` block in `config.yaml`
+
+```yaml
+  - name: translator
+    source: community
+    path: .nimble/skills/translator/skill.py
+    class_name: TranslatorSkill
+    binding: "ctrl+shift+t"
+    configuration:
+      target_language: es
+      api_key: sk-abc123
+```
+
+You can edit this block manually at any time. All values are stored and delivered as strings — YAML integers (e.g. `count: 5`) are coerced to `"5"`. When the block is absent, `self.configuration` defaults to `{}`.
+
+### Step 4 — Access values in skill code
+
+`self.configuration` is available in `on_load`, `run()`, `on_error()`, and `on_unload()`.
+
+```python
+class TranslatorSkill:
+    def on_load(self, config):
+        self._lang = self.configuration.get("target_language", "en")
+
+    def run(self, context, tools):
+        text = context.selection or context.clipboard
+        if not text:
+            tools.popup.show("Select or copy some text first.")
+            return
+        result = tools.ai.ask(text, prompt=f"Translate to {self._lang} in one sentence.")
+        tools.clipboard.set(result)
+        tools.popup.show("Translation copied to clipboard.")
+```
+
+Caching in `on_load` (as `self._lang` above) avoids repeated dict lookups on every hotkey fire. Accessing `self.configuration` directly in `run()` is equally valid and simpler for one-off reads.
+
+**Canonical access path:** always use `self.configuration`. The `config` dict passed to `on_load` also contains a `"configuration"` key (the raw JSON payload), but `self.configuration` is the documented, str-coerced interface — prefer it over `config.get("configuration")`.
+
+---
+
+## 7. Complete Working Example
 
 ```python
 # skills/summarise/skill.py
@@ -237,7 +329,7 @@ author: "Your Name"
 
 ---
 
-## 7. Anti-Patterns
+## 8. Anti-Patterns
 
 ```python
 # WRONG — do not annotate with nimble types (skill venv won't have nimble installed)
@@ -289,11 +381,22 @@ class GoodSkill:
         self._count = 0
     def run(self, context, tools):
         self._count += 1   # instance state is fine (one worker process per skill)
+
+
+# WRONG — do not read configuration via the on_load config dict
+class BadConfigSkill:
+    def on_load(self, config):
+        self._lang = config.get("configuration", {}).get("target_language", "en")
+
+# CORRECT — use self.configuration (always set before on_load, str-coerced)
+class GoodConfigSkill:
+    def on_load(self, config):
+        self._lang = self.configuration.get("target_language", "en")
 ```
 
 ---
 
-## 8. Maintenance Contract (for contributors)
+## 9. Maintenance Contract (for contributors)
 
 `skill-build.md` is a **required PR artifact** (NFR21). Any PR that changes any of the following files **must** update this document in the same PR:
 
@@ -304,9 +407,12 @@ class GoodSkill:
 | `worker/entrypoint.py` — lifecycle invocations / construction | Section 1 lifecycle signatures |
 | `nimble/__init__.py` — `SUPPORTED_API_VERSION` | Section 4 `api_version` note |
 | `nimble/manifest/parser.py` — `ManifestSpec` fields, required-field set | Section 4 manifest spec |
+| `nimble/manifest/parser.py` — `ConfigFieldSpec` fields, `_parse_config_fields` behaviour | Section 4 optional fields, Section 6 |
+| `nimble/manifest/parser.py` — `append_skill_to_config` `configuration` parameter | Section 6 Step 2/3 |
 | `nimble/skills/runner.py` — api_version refusal, lifecycle phase tracking | Sections 1, 4 |
 | `nimble/skills/registry.py` — `SkillConfig` fields | Section 5 config.yaml entry |
 | `nimble/cli/commands.py` — `_PERMISSION_DESCRIPTIONS` | Section 4 permissions table |
+| `nimble/cli/commands.py` — `_collect_config_values` prompt format or validation | Section 6 Step 2 |
 
 `api_version` in `nimble/__init__.py` must be incremented on every breaking skill interface change (NFR23). The daemon refuses skills whose `api_version` exceeds `SUPPORTED_API_VERSION`.
 

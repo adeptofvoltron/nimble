@@ -237,6 +237,7 @@ def append_skill_to_config(
     binding: str,
     repo_url: str,
     repo_root: Path,
+    configuration: dict[str, str] | None = None,
 ) -> None:
     if not (spec.class_name or "").strip():
         raise ConfigError(
@@ -265,6 +266,8 @@ def append_skill_to_config(
         "installed_from": repo_url,
         "version": spec.version,
     }
+    if configuration:
+        entry["configuration"] = configuration
     skills.append(entry)
     raw["skills"] = skills
     atomic_write(

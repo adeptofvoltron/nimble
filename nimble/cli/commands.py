@@ -5,8 +5,12 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
+
+if TYPE_CHECKING:
+    from nimble.manifest.parser import ConfigFieldSpec
 
 import nimble.state as state
 from nimble.platform import is_windows
@@ -31,6 +35,51 @@ def _prompt_install_confirm_y_only() -> bool:
     except (OSError, UnicodeDecodeError):
         return False
     return line.rstrip("\r\n") in ("y", "Y")
+
+
+def _collect_config_values(
+    config_fields: list[ConfigFieldSpec],
+) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for cf in config_fields:
+        while True:
+            if cf.possible_values:
+                choices = "/".join(cf.possible_values)
+                prompt = f"{cf.key} — {cf.description} [{choices}]"
+            else:
+                prompt = f"{cf.key} — {cf.description}"
+            if cf.default is not None:
+                prompt += f" (default: '{cf.default}')"
+            prompt += ": "
+            typer.echo(prompt, nl=False)
+            try:
+                raw = sys.stdin.readline()
+            except (OSError, UnicodeDecodeError):
+                typer.echo(
+                    f"Failed to read input for '{cf.key}'.",
+                    err=True,
+                )
+                raise typer.Exit(1)
+            if raw == "":
+                typer.echo(
+                    f"Input stream closed while reading '{cf.key}'.",
+                    err=True,
+                )
+                raise typer.Exit(1)
+            value = raw.rstrip("\r\n").strip()
+            if value == "":
+                if cf.default is not None:
+                    result[cf.key] = cf.default
+                    break
+                typer.echo(f"'{cf.key}' is required.")
+                continue
+            if cf.possible_values and value not in cf.possible_values:
+                joined = ", ".join(cf.possible_values)
+                typer.echo(f"Invalid value. Choose from: {joined}")
+                continue
+            result[cf.key] = value
+            break
+    return result
 
 
 def _running_pid_or_none(data: object) -> int | None:
@@ -335,6 +384,8 @@ def add(
         typer.echo("Installation cancelled.")
         raise typer.Exit(0)
 
+    configuration = _collect_config_values(spec.config_fields)
+
     import shutil
 
     from nimble.manifest.installer import (
@@ -368,7 +419,9 @@ def add(
 
     config_path = repo_root / "config.yaml"
     try:
-        append_skill_to_config(config_path, spec, shortcut, repo_url, repo_root)
+        append_skill_to_config(
+            config_path, spec, shortcut, repo_url, repo_root, configuration
+        )
     except ConfigError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1)

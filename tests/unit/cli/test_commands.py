@@ -6,10 +6,11 @@ from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
-from nimble.cli.commands import app
+from nimble.cli.commands import _collect_config_values, app
 from nimble.manifest.installer import InstallError
 from nimble.manifest.parser import (
     ConfigError,
+    ConfigFieldSpec,
     ManifestError,
     ManifestSpec,
     NimbleConfig,
@@ -533,6 +534,226 @@ def test_add_lock_write_failure_rolls_back_config(tmp_path: Path) -> None:
     assert "removed from config.yaml" in result.output
     data = _yaml.safe_load(cfg.read_text(encoding="utf-8"))
     assert data["skills"] == []
+
+
+def _make_manifest_spec_with_fields(**overrides: object) -> ManifestSpec:
+    fields = [
+        ConfigFieldSpec(
+            key="target_language",
+            description="Target language code",
+            default="en",
+            possible_values=["en", "es", "fr"],
+        )
+    ]
+    return _make_manifest_spec(config_fields=fields, **overrides)
+
+
+def test_add_prompts_config_fields_after_confirmation() -> None:
+    spec = _make_manifest_spec_with_fields()
+    fake_root = Path("/tmp/nimble-fake-root")
+    with (
+        patch("nimble.manifest.parser.fetch_remote_manifest", return_value=spec),
+        patch("nimble.cli.commands._repo_root", return_value=fake_root),
+        patch("nimble.manifest.installer.clone_skill_repo"),
+        patch("nimble.manifest.installer.install_skill_venv"),
+        patch("nimble.manifest.parser.append_skill_to_config"),
+        patch("nimble.manifest.lock.write_lock_entry"),
+    ):
+        result = runner.invoke(
+            app,
+            ["add", "ctrl+shift+d", "github.com/user/skill"],
+            input="y\nes\n",
+        )
+    assert "target_language" in result.output
+    assert "Target language code" in result.output
+    assert "[en/es/fr]" in result.output
+    assert "(default: 'en')" in result.output
+
+
+def test_add_config_field_enter_uses_default() -> None:
+    spec = _make_manifest_spec_with_fields()
+    fake_root = Path("/tmp/nimble-fake-root")
+    with (
+        patch("nimble.manifest.parser.fetch_remote_manifest", return_value=spec),
+        patch("nimble.cli.commands._repo_root", return_value=fake_root),
+        patch("nimble.manifest.installer.clone_skill_repo"),
+        patch("nimble.manifest.installer.install_skill_venv"),
+        patch("nimble.manifest.parser.append_skill_to_config") as mock_append,
+        patch("nimble.manifest.lock.write_lock_entry"),
+    ):
+        result = runner.invoke(
+            app,
+            ["add", "ctrl+shift+d", "github.com/user/skill"],
+            input="y\n\n",
+        )
+    assert result.exit_code == 0
+    assert mock_append.called
+    call_args = mock_append.call_args
+    configuration = (
+        call_args.args[5]
+        if len(call_args.args) > 5
+        else call_args.kwargs.get("configuration")
+    )
+    assert configuration == {"target_language": "en"}
+
+
+def test_add_config_field_invalid_value_reprompts() -> None:
+    spec = _make_manifest_spec_with_fields()
+    fake_root = Path("/tmp/nimble-fake-root")
+    with (
+        patch("nimble.manifest.parser.fetch_remote_manifest", return_value=spec),
+        patch("nimble.cli.commands._repo_root", return_value=fake_root),
+        patch("nimble.manifest.installer.clone_skill_repo"),
+        patch("nimble.manifest.installer.install_skill_venv"),
+        patch("nimble.manifest.parser.append_skill_to_config"),
+        patch("nimble.manifest.lock.write_lock_entry"),
+    ):
+        result = runner.invoke(
+            app,
+            ["add", "ctrl+shift+d", "github.com/user/skill"],
+            input="y\nzh\nes\n",
+        )
+    assert "Invalid value" in result.output
+    assert result.exit_code == 0
+
+
+def test_add_config_field_required_no_default_reprompts() -> None:
+    fields = [ConfigFieldSpec(key="api_key", description="API key")]
+    spec = _make_manifest_spec(config_fields=fields)
+    fake_root = Path("/tmp/nimble-fake-root")
+    with (
+        patch("nimble.manifest.parser.fetch_remote_manifest", return_value=spec),
+        patch("nimble.cli.commands._repo_root", return_value=fake_root),
+        patch("nimble.manifest.installer.clone_skill_repo"),
+        patch("nimble.manifest.installer.install_skill_venv"),
+        patch("nimble.manifest.parser.append_skill_to_config"),
+        patch("nimble.manifest.lock.write_lock_entry"),
+    ):
+        result = runner.invoke(
+            app,
+            ["add", "ctrl+shift+d", "github.com/user/skill"],
+            input="y\n\nsecret\n",
+        )
+    assert "'api_key' is required." in result.output
+    assert result.exit_code == 0
+
+
+def test_add_empty_config_fields_no_prompts() -> None:
+    spec = _make_manifest_spec(config_fields=[])
+    fake_root = Path("/tmp/nimble-fake-root")
+    with (
+        patch("nimble.manifest.parser.fetch_remote_manifest", return_value=spec),
+        patch("nimble.cli.commands._repo_root", return_value=fake_root),
+        patch("nimble.manifest.installer.clone_skill_repo"),
+        patch("nimble.manifest.installer.install_skill_venv"),
+        patch("nimble.manifest.parser.append_skill_to_config") as mock_append,
+        patch("nimble.manifest.lock.write_lock_entry"),
+    ):
+        result = runner.invoke(
+            app,
+            ["add", "ctrl+shift+d", "github.com/user/skill"],
+            input="y\n",
+        )
+    assert result.exit_code == 0
+    call_args = mock_append.call_args
+    configuration = (
+        call_args.args[5]
+        if len(call_args.args) > 5
+        else call_args.kwargs.get("configuration", {})
+    )
+    assert configuration == {}
+
+
+def test_add_passes_configuration_to_append_skill_to_config() -> None:
+    spec = _make_manifest_spec_with_fields()
+    fake_root = Path("/tmp/nimble-fake-root")
+    with (
+        patch("nimble.manifest.parser.fetch_remote_manifest", return_value=spec),
+        patch("nimble.cli.commands._repo_root", return_value=fake_root),
+        patch("nimble.manifest.installer.clone_skill_repo"),
+        patch("nimble.manifest.installer.install_skill_venv"),
+        patch("nimble.manifest.parser.append_skill_to_config") as mock_append,
+        patch("nimble.manifest.lock.write_lock_entry"),
+    ):
+        runner.invoke(
+            app,
+            ["add", "ctrl+shift+d", "github.com/user/skill"],
+            input="y\nes\n",
+        )
+    call_args = mock_append.call_args
+    configuration = (
+        call_args.args[5]
+        if len(call_args.args) > 5
+        else call_args.kwargs.get("configuration")
+    )
+    assert configuration == {"target_language": "es"}
+
+
+def test_add_config_field_eof_exits_nonzero() -> None:
+    fields = [ConfigFieldSpec(key="api_key", description="API key")]
+    spec = _make_manifest_spec(config_fields=fields)
+    fake_root = Path("/tmp/nimble-fake-root")
+    with (
+        patch("nimble.manifest.parser.fetch_remote_manifest", return_value=spec),
+        patch("nimble.cli.commands._repo_root", return_value=fake_root),
+        patch("nimble.manifest.installer.clone_skill_repo"),
+        patch("nimble.manifest.installer.install_skill_venv"),
+        patch("nimble.manifest.parser.append_skill_to_config") as mock_append,
+        patch("nimble.manifest.lock.write_lock_entry"),
+    ):
+        result = runner.invoke(
+            app,
+            ["add", "ctrl+shift+d", "github.com/user/skill"],
+            input="y\n",
+        )
+    assert result.exit_code == 1
+    assert "Input stream closed while reading 'api_key'." in result.output
+    mock_append.assert_not_called()
+
+
+def test_add_config_field_read_error_exits_nonzero() -> None:
+    fields = [ConfigFieldSpec(key="api_key", description="API key")]
+    with (
+        patch(
+            "nimble.cli.commands.sys.stdin.readline",
+            side_effect=OSError("stdin failed"),
+        ),
+        patch("nimble.cli.commands.typer.echo") as mock_echo,
+    ):
+        try:
+            _collect_config_values(fields)
+        except Exception as exc:  # click.exceptions.Exit
+            assert exc.__class__.__name__ == "Exit"
+            assert getattr(exc, "exit_code", None) == 1
+        else:
+            raise AssertionError("expected click Exit")
+    mock_echo.assert_any_call("Failed to read input for 'api_key'.", err=True)
+
+
+def test_add_config_field_trims_allowed_value_whitespace() -> None:
+    spec = _make_manifest_spec_with_fields()
+    fake_root = Path("/tmp/nimble-fake-root")
+    with (
+        patch("nimble.manifest.parser.fetch_remote_manifest", return_value=spec),
+        patch("nimble.cli.commands._repo_root", return_value=fake_root),
+        patch("nimble.manifest.installer.clone_skill_repo"),
+        patch("nimble.manifest.installer.install_skill_venv"),
+        patch("nimble.manifest.parser.append_skill_to_config") as mock_append,
+        patch("nimble.manifest.lock.write_lock_entry"),
+    ):
+        result = runner.invoke(
+            app,
+            ["add", "ctrl+shift+d", "github.com/user/skill"],
+            input="y\n es \n",
+        )
+    assert result.exit_code == 0
+    call_args = mock_append.call_args
+    configuration = (
+        call_args.args[5]
+        if len(call_args.args) > 5
+        else call_args.kwargs.get("configuration")
+    )
+    assert configuration == {"target_language": "es"}
 
 
 def test_terminate_windows_openprocess_failure_raises() -> None:

@@ -852,6 +852,57 @@ def test_load_config_skill_configuration_non_dict_raises(tmp_path: Path) -> None
         load_config(cfg)
 
 
+# ---------------------------------------------------------------------------
+# append_skill_to_config — configuration parameter tests (AC: 5, 6)
+# ---------------------------------------------------------------------------
+
+
+def test_append_skill_to_config_writes_configuration_block(tmp_path: Path) -> None:
+    import yaml as _yaml
+
+    cfg = _write_config(tmp_path, "skills: []\n")
+    spec = _make_manifest_spec(class_name="Translator")
+    append_skill_to_config(
+        cfg,
+        spec,
+        "ctrl+t",
+        "github.com/u/r",
+        tmp_path,
+        configuration={"target_language": "es"},
+    )
+    data = _yaml.safe_load(cfg.read_text(encoding="utf-8"))
+    entry = data["skills"][0]
+    assert entry["configuration"] == {"target_language": "es"}
+
+
+def test_append_skill_to_config_no_configuration_block_when_empty(
+    tmp_path: Path,
+) -> None:
+    import yaml as _yaml
+
+    cfg = _write_config(tmp_path, "skills: []\n")
+    spec = _make_manifest_spec(class_name="Translator")
+    append_skill_to_config(
+        cfg, spec, "ctrl+t", "github.com/u/r", tmp_path, configuration={}
+    )
+    data = _yaml.safe_load(cfg.read_text(encoding="utf-8"))
+    entry = data["skills"][0]
+    assert "configuration" not in entry
+
+
+def test_append_skill_to_config_no_configuration_block_when_none(
+    tmp_path: Path,
+) -> None:
+    import yaml as _yaml
+
+    cfg = _write_config(tmp_path, "skills: []\n")
+    spec = _make_manifest_spec(class_name="Translator")
+    append_skill_to_config(cfg, spec, "ctrl+t", "github.com/u/r", tmp_path)
+    data = _yaml.safe_load(cfg.read_text(encoding="utf-8"))
+    entry = data["skills"][0]
+    assert "configuration" not in entry
+
+
 def test_load_config_skill_configuration_coerces_values_to_str(tmp_path: Path) -> None:
     cfg = _write_config(
         tmp_path,
