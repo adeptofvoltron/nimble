@@ -367,6 +367,26 @@ def _parse_ai_config(data: dict[str, Any]) -> AiConfig | None:
     )
 
 
+def _parse_skill_configuration(
+    entry: dict[str, Any], i: int
+) -> dict[str, str]:
+    raw = entry.get("configuration")
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ConfigError(
+            f"Skill entry at index {i} 'configuration' must be a mapping"
+        )
+    result: dict[str, str] = {}
+    for k, v in raw.items():
+        if not isinstance(k, str):
+            raise ConfigError(
+                f"Skill entry at index {i} 'configuration' keys must be strings"
+            )
+        result[k] = str(v)
+    return result
+
+
 def _parse_skills(raw: Any) -> list[SkillConfig]:
     if not isinstance(raw, list):
         raise ConfigError("'skills' must be a list")
@@ -401,6 +421,7 @@ def _parse_skills(raw: Any) -> list[SkillConfig]:
                 binding=entry["binding"],
                 path=entry["path"],
                 class_name=entry["class_name"],
+                configuration=_parse_skill_configuration(entry, i),
             )
         )
 

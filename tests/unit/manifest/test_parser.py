@@ -798,3 +798,71 @@ def test_parse_manifest_config_fields_default_must_be_in_possible_values() -> No
         ManifestError, match="field 'default' must be one of 'possible_values'"
     ):
         parse_manifest_yaml(content)
+
+
+# ---------------------------------------------------------------------------
+# SkillConfig.configuration tests (AC: 1, 2)
+# ---------------------------------------------------------------------------
+
+
+def test_load_config_skill_with_configuration(tmp_path: Path) -> None:
+    cfg = _write_config(
+        tmp_path,
+        "skills:\n"
+        "  - name: translator\n"
+        "    source: local\n"
+        "    path: skills/translator/skill.py\n"
+        "    class_name: Translator\n"
+        "    binding: ctrl+shift+t\n"
+        "    configuration:\n"
+        "      target_language: es\n"
+        "      fallback: en\n",
+    )
+    result = load_config(cfg)
+    assert len(result.skills) == 1
+    assert result.skills[0].configuration == {"target_language": "es", "fallback": "en"}
+
+
+def test_load_config_skill_no_configuration_defaults_to_empty(tmp_path: Path) -> None:
+    cfg = _write_config(
+        tmp_path,
+        "skills:\n"
+        "  - name: my_skill\n"
+        "    source: local\n"
+        "    path: skills/my_skill/skill.py\n"
+        "    class_name: MySkill\n"
+        "    binding: ctrl+x\n",
+    )
+    result = load_config(cfg)
+    assert result.skills[0].configuration == {}
+
+
+def test_load_config_skill_configuration_non_dict_raises(tmp_path: Path) -> None:
+    cfg = _write_config(
+        tmp_path,
+        "skills:\n"
+        "  - name: bad_skill\n"
+        "    source: local\n"
+        "    path: skills/bad_skill/skill.py\n"
+        "    class_name: BadSkill\n"
+        "    binding: ctrl+b\n"
+        "    configuration: not_a_dict\n",
+    )
+    with pytest.raises(ConfigError):
+        load_config(cfg)
+
+
+def test_load_config_skill_configuration_coerces_values_to_str(tmp_path: Path) -> None:
+    cfg = _write_config(
+        tmp_path,
+        "skills:\n"
+        "  - name: my_skill\n"
+        "    source: local\n"
+        "    path: skills/my_skill/skill.py\n"
+        "    class_name: MySkill\n"
+        "    binding: ctrl+x\n"
+        "    configuration:\n"
+        "      count: 5\n",
+    )
+    result = load_config(cfg)
+    assert result.skills[0].configuration == {"count": "5"}

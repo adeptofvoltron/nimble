@@ -16,6 +16,8 @@ from worker.context import Context
 
 
 class _FakeSkill:
+    configuration: dict[str, str]
+
     def run(self, context: Context, tools: Any) -> None:
         pass
 
@@ -325,3 +327,180 @@ def test_thread_excepthook_serialises_to_stdout() -> None:
     assert "boom" in response["error"]["message"]
     assert response["error"]["skill_file"] != ""
     assert response["error"]["line"] > 0
+
+
+# ---------------------------------------------------------------------------
+# skill.configuration injection tests (AC: 4, 5, 6, 7)
+# ---------------------------------------------------------------------------
+
+
+def test_worker_sets_skill_configuration_before_on_load() -> None:
+    on_load_config: dict[str, Any] = {}
+
+    class _ConfigSkill:
+        configuration: dict[str, str]
+
+        def on_load(self, config: dict[str, Any]) -> None:
+            on_load_config.update(config)
+
+        def run(self, context: Context, tools: Any) -> None:
+            pass
+
+    skill_instance = _ConfigSkill()
+    stdout_buf = io.StringIO()
+    fake_class = MagicMock(return_value=skill_instance)
+
+    env = {
+        **os.environ,
+        "NIMBLE_SKILL_CONFIG": json.dumps(
+            {
+                "name": "translator",
+                "source": "local",
+                "binding": "ctrl+t",
+                "path": "skills/translator/skill.py",
+                "class_name": "Translator",
+                "configuration": {"target_language": "es"},
+            }
+        ),
+    }
+    with (
+        patch.object(entrypoint_mod, "_load_skill_class", return_value=fake_class),
+        patch("sys.stdin", io.StringIO("")),
+        patch("sys.stdout", stdout_buf),
+        patch.dict(os.environ, env, clear=True),
+    ):
+        entrypoint_mod.run("fake/path.py", "FakeSkill")
+
+    assert skill_instance.configuration == {"target_language": "es"}
+    assert on_load_config["name"] == "translator"
+    assert on_load_config["configuration"] == {"target_language": "es"}
+
+
+def test_worker_configuration_defaults_to_empty_dict() -> None:
+    skill_instance = _FakeSkill()
+    stdout_buf = io.StringIO()
+    fake_class = MagicMock(return_value=skill_instance)
+
+    env = {
+        **os.environ,
+        "NIMBLE_SKILL_CONFIG": json.dumps(
+            {
+                "name": "my_skill",
+                "source": "local",
+                "binding": "ctrl+x",
+                "path": "skills/my_skill/skill.py",
+                "class_name": "MySkill",
+            }
+        ),
+    }
+    with (
+        patch.object(entrypoint_mod, "_load_skill_class", return_value=fake_class),
+        patch("sys.stdin", io.StringIO("")),
+        patch("sys.stdout", stdout_buf),
+        patch.dict(os.environ, env, clear=True),
+    ):
+        entrypoint_mod.run("fake/path.py", "FakeSkill")
+
+    assert skill_instance.configuration == {}
+
+
+def test_worker_skill_run_accesses_configuration_with_values() -> None:
+    """AC 5: skill's run() can access self.configuration values"""
+    config_accessed: dict[str, Any] = {}
+
+    class _RunConfigSkill:
+        configuration: dict[str, str]
+
+        def run(self, context: Context, tools: Any) -> None:
+            config_accessed.update(self.configuration)
+
+        def on_load(self, config: dict[str, Any]) -> None:
+            pass
+
+    skill_instance = _RunConfigSkill()
+    stdout_buf = io.StringIO()
+    fake_class = MagicMock(return_value=skill_instance)
+
+    invocation_input = json.dumps(
+        {
+            "invocation_id": "test-123",
+            "context": {
+                "selection": "",
+                "clipboard": "",
+                "active_app": "",
+                "mouse_position": [0, 0],
+            },
+        }
+    )
+
+    env = {
+        **os.environ,
+        "NIMBLE_SKILL_CONFIG": json.dumps(
+            {
+                "name": "translator",
+                "source": "local",
+                "binding": "ctrl+t",
+                "path": "skills/translator/skill.py",
+                "class_name": "Translator",
+                "configuration": {"target_language": "es", "fallback": "en"},
+            }
+        ),
+    }
+    with (
+        patch.object(entrypoint_mod, "_load_skill_class", return_value=fake_class),
+        patch("sys.stdin", io.StringIO(invocation_input + "\n")),
+        patch("sys.stdout", stdout_buf),
+        patch.dict(os.environ, env, clear=True),
+    ):
+        entrypoint_mod.run("fake/path.py", "Translator")
+
+    assert config_accessed == {"target_language": "es", "fallback": "en"}
+
+
+def test_worker_skill_run_accesses_empty_configuration_no_error() -> None:
+    """AC 6: skill's run() accesses self.configuration == {} without AttributeError"""
+    config_value: dict[str, Any] = {}
+
+    class _RunNoConfigSkill:
+        configuration: dict[str, str]
+
+        def run(self, context: Context, tools: Any) -> None:
+            config_value.update(self.configuration)
+
+    skill_instance = _RunNoConfigSkill()
+    stdout_buf = io.StringIO()
+    fake_class = MagicMock(return_value=skill_instance)
+
+    invocation_input = json.dumps(
+        {
+            "invocation_id": "test-456",
+            "context": {
+                "selection": "",
+                "clipboard": "",
+                "active_app": "",
+                "mouse_position": [0, 0],
+            },
+        }
+    )
+
+    env = {
+        **os.environ,
+        "NIMBLE_SKILL_CONFIG": json.dumps(
+            {
+                "name": "my_skill",
+                "source": "local",
+                "binding": "ctrl+x",
+                "path": "skills/my_skill/skill.py",
+                "class_name": "MySkill",
+            }
+        ),
+    }
+    with (
+        patch.object(entrypoint_mod, "_load_skill_class", return_value=fake_class),
+        patch("sys.stdin", io.StringIO(invocation_input + "\n")),
+        patch("sys.stdout", stdout_buf),
+        patch.dict(os.environ, env, clear=True),
+    ):
+        entrypoint_mod.run("fake/path.py", "MySkill")
+
+    assert config_value == {}

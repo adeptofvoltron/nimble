@@ -643,3 +643,45 @@ def test_spawn_workers_skips_check_when_manifest_has_no_api_version() -> None:
     assert registry.get("my-skill").status == "loaded"  # type: ignore[union-attr]
     assert len(notifier.sent) == 0
     mock_logger.warning.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# configuration injection tests (AC: 3)
+# ---------------------------------------------------------------------------
+
+
+def test_spawn_workers_passes_configuration_in_skill_config_json() -> None:
+    config = SkillConfig(
+        name="my-skill",
+        source="local",
+        binding="ctrl+shift+a",
+        path="/path/to/skill.py",
+        class_name="MySkill",
+        configuration={"target_language": "es"},
+    )
+    registry = SkillRegistry()
+    runner = _make_runner(registry=registry)
+    ok_response = {"invocation_id": "abc", "status": "ok", "error": None}
+    fake_proc = _make_fake_proc(ok_response)
+
+    with patch("subprocess.Popen", return_value=fake_proc) as mock_popen:
+        runner.spawn_workers([config])
+        _, kwargs = mock_popen.call_args
+        env = kwargs["env"]
+        skill_config = json.loads(env["NIMBLE_SKILL_CONFIG"])
+        assert skill_config["configuration"] == {"target_language": "es"}
+
+
+def test_spawn_workers_passes_empty_configuration_when_none_set() -> None:
+    config = _make_config()
+    registry = SkillRegistry()
+    runner = _make_runner(registry=registry)
+    ok_response = {"invocation_id": "abc", "status": "ok", "error": None}
+    fake_proc = _make_fake_proc(ok_response)
+
+    with patch("subprocess.Popen", return_value=fake_proc) as mock_popen:
+        runner.spawn_workers([config])
+        _, kwargs = mock_popen.call_args
+        env = kwargs["env"]
+        skill_config = json.loads(env["NIMBLE_SKILL_CONFIG"])
+        assert skill_config["configuration"] == {}
