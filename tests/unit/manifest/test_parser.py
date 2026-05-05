@@ -12,6 +12,7 @@ from nimble import SUPPORTED_API_VERSION
 from nimble.manifest.parser import (
     AiConfig,
     ConfigError,
+    ConfigFieldSpec,
     ManifestError,
     ManifestSpec,
     NimbleConfig,
@@ -647,3 +648,153 @@ def test_remove_skill_entry_from_config_skills_not_list_raises(
     cfg.write_text("skills: {}\n", encoding="utf-8")
     with pytest.raises(ConfigError, match="Rollback failed"):
         remove_skill_entry_from_config(cfg, "x")
+
+
+# ---------------------------------------------------------------------------
+# config_fields tests (AC 1–5)
+# ---------------------------------------------------------------------------
+
+_VALID_MANIFEST_WITH_CONFIG_FIELDS = (
+    _VALID_MANIFEST_YAML
+    + "config_fields:\n"
+    "  - key: target_language\n"
+    "    description: Target language code\n"
+    "    default: en\n"
+    "    possible_values:\n"
+    "      - en\n"
+    "      - es\n"
+    "      - fr\n"
+)
+
+
+def test_parse_manifest_config_fields_populated() -> None:
+    spec = parse_manifest_yaml(_VALID_MANIFEST_WITH_CONFIG_FIELDS)
+    assert len(spec.config_fields) == 1
+    cf = spec.config_fields[0]
+    assert isinstance(cf, ConfigFieldSpec)
+    assert cf.key == "target_language"
+    assert cf.description == "Target language code"
+    assert cf.default == "en"
+
+
+def test_parse_manifest_config_fields_possible_values_parsed() -> None:
+    spec = parse_manifest_yaml(_VALID_MANIFEST_WITH_CONFIG_FIELDS)
+    assert spec.config_fields[0].possible_values == ["en", "es", "fr"]
+
+
+def test_parse_manifest_config_fields_no_possible_values_is_none() -> None:
+    content = (
+        _VALID_MANIFEST_YAML
+        + "config_fields:\n"
+        "  - key: output_format\n"
+        "    description: Output format\n"
+    )
+    spec = parse_manifest_yaml(content)
+    assert spec.config_fields[0].possible_values is None
+
+
+def test_parse_manifest_no_config_fields_defaults_to_empty() -> None:
+    spec = parse_manifest_yaml(_VALID_MANIFEST_YAML)
+    assert spec.config_fields == []
+
+
+def test_parse_manifest_config_fields_missing_key_raises() -> None:
+    content = (
+        _VALID_MANIFEST_YAML
+        + "config_fields:\n"
+        "  - description: No key field here\n"
+    )
+    with pytest.raises(ManifestError, match="missing required field 'key'"):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_config_fields_missing_description_raises() -> None:
+    content = (
+        _VALID_MANIFEST_YAML
+        + "config_fields:\n"
+        "  - key: some_key\n"
+    )
+    with pytest.raises(ManifestError, match="missing required field 'description'"):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_config_fields_not_list_raises() -> None:
+    content = _VALID_MANIFEST_YAML + "config_fields: bad\n"
+    with pytest.raises(ManifestError, match="field 'config_fields' must be a list"):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_config_fields_entry_not_mapping_raises() -> None:
+    content = _VALID_MANIFEST_YAML + "config_fields:\n  - hello\n"
+    with pytest.raises(ManifestError, match="must be a mapping"):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_config_fields_default_non_string_raises() -> None:
+    content = (
+        _VALID_MANIFEST_YAML
+        + "config_fields:\n"
+        "  - key: target_language\n"
+        "    description: Target language code\n"
+        "    default: 42\n"
+    )
+    with pytest.raises(
+        ManifestError, match="field 'default' must be a string or null"
+    ):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_config_fields_possible_values_items_must_be_strings() -> None:
+    content = (
+        _VALID_MANIFEST_YAML
+        + "config_fields:\n"
+        "  - key: target_language\n"
+        "    description: Target language code\n"
+        "    possible_values:\n"
+        "      - en\n"
+        "      - 2\n"
+    )
+    match = "'possible_values' must be a list of strings"
+    with pytest.raises(ManifestError, match=match):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_config_fields_key_must_be_non_empty_string() -> None:
+    content = (
+        _VALID_MANIFEST_YAML
+        + "config_fields:\n"
+        "  - key: \"   \"\n"
+        "    description: Target language code\n"
+    )
+    with pytest.raises(ManifestError, match="field 'key' must be a non-empty string"):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_config_fields_description_must_be_non_empty_string() -> None:
+    content = (
+        _VALID_MANIFEST_YAML
+        + "config_fields:\n"
+        "  - key: target_language\n"
+        "    description: \"\"\n"
+    )
+    with pytest.raises(
+        ManifestError, match="field 'description' must be a non-empty string"
+    ):
+        parse_manifest_yaml(content)
+
+
+def test_parse_manifest_config_fields_default_must_be_in_possible_values() -> None:
+    content = (
+        _VALID_MANIFEST_YAML
+        + "config_fields:\n"
+        "  - key: target_language\n"
+        "    description: Target language code\n"
+        "    default: de\n"
+        "    possible_values:\n"
+        "      - en\n"
+        "      - es\n"
+    )
+    with pytest.raises(
+        ManifestError, match="field 'default' must be one of 'possible_values'"
+    ):
+        parse_manifest_yaml(content)

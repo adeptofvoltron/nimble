@@ -1,11 +1,17 @@
-skills:
-  - name: hello_world
-    source: local
-    path: skills/hello_world/skill.py
-    class_name: HelloWorldSkill
-    binding: "ctrl+l"
-
 ai:
-  provider: anthropic
-  model: claude-sonnet-4-6
   api_key_env: ANTHROPIC_API_KEY
+  model: claude-sonnet-4-6
+  provider: anthropic
+skills:
+- binding: ctrl+l
+  class_name: HelloWorldSkill
+  name: hello_world
+  path: skills/hello_world/skill.py
+  source: local
+- binding: ctrl+t+r
+  class_name: TranslateSkill
+  installed_from: https://github.com/adeptofvoltron/nimble-translate-skill
+  name: translate
+  path: .nimble/skills/translate/skill.py
+  source: community
+  version: 1.0.0

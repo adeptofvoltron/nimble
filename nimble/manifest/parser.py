@@ -25,6 +25,14 @@ class ManifestError(Exception):
 
 
 @dataclass
+class ConfigFieldSpec:
+    key: str
+    description: str
+    default: str | None = None
+    possible_values: list[str] | None = None
+
+
+@dataclass
 class ManifestSpec:
     name: str
     version: str
@@ -36,6 +44,7 @@ class ManifestSpec:
     author: str
     requires: list[str] = field(default_factory=list)
     class_name: str = ""
+    config_fields: list[ConfigFieldSpec] = field(default_factory=list)
 
 
 def _validate_manifest_skill_name(raw: object, source: str) -> str:
@@ -85,6 +94,88 @@ def _parse_manifest_string_list(
             " must be a list of strings"
         )
     return raw
+
+
+def _require_non_empty_str(
+    entry: dict[str, Any], field_name: str, i: int, source: str
+) -> str:
+    if field_name not in entry:
+        raise ManifestError(
+            f"manifest.yaml from {source} config_fields[{i}]"
+            f" missing required field '{field_name}'"
+        )
+    value = entry[field_name]
+    if not isinstance(value, str) or not value.strip():
+        raise ManifestError(
+            f"manifest.yaml from {source} config_fields[{i}]"
+            f" field '{field_name}' must be a non-empty string"
+        )
+    return value
+
+
+def _parse_config_field_default(
+    entry: dict[str, Any], i: int, source: str
+) -> str | None:
+    if "default" not in entry:
+        return None
+    raw = entry["default"]
+    if raw is None or isinstance(raw, str):
+        return raw
+    raise ManifestError(
+        f"manifest.yaml from {source} config_fields[{i}]"
+        " field 'default' must be a string or null"
+    )
+
+
+def _parse_config_field_possible_values(
+    entry: dict[str, Any], i: int, source: str
+) -> list[str] | None:
+    raw = entry.get("possible_values")
+    if raw is None:
+        return None
+    if not isinstance(raw, list) or any(not isinstance(v, str) for v in raw):
+        raise ManifestError(
+            f"manifest.yaml from {source} config_fields[{i}]"
+            " 'possible_values' must be a list of strings"
+        )
+    return raw
+
+
+def _parse_config_field_entry(entry: Any, i: int, source: str) -> ConfigFieldSpec:
+    if not isinstance(entry, dict):
+        raise ManifestError(
+            f"manifest.yaml from {source} config_fields[{i}] must be a mapping"
+        )
+    key = _require_non_empty_str(entry, "key", i, source)
+    description = _require_non_empty_str(entry, "description", i, source)
+    default = _parse_config_field_default(entry, i, source)
+    possible_values = _parse_config_field_possible_values(entry, i, source)
+    if (
+        default is not None
+        and possible_values is not None
+        and default not in possible_values
+    ):
+        raise ManifestError(
+            f"manifest.yaml from {source} config_fields[{i}]"
+            " field 'default' must be one of 'possible_values'"
+        )
+    return ConfigFieldSpec(
+        key=key,
+        description=description,
+        default=default,
+        possible_values=possible_values,
+    )
+
+
+def _parse_config_fields(data: dict[str, Any], source: str) -> list[ConfigFieldSpec]:
+    raw = data.get("config_fields")
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ManifestError(
+            f"manifest.yaml from {source} field 'config_fields' must be a list"
+        )
+    return [_parse_config_field_entry(entry, i, source) for i, entry in enumerate(raw)]
 
 
 @dataclass
@@ -362,6 +453,7 @@ def parse_manifest_yaml(content: str, source: str = "<string>") -> ManifestSpec:
         )
 
     skill_name = _validate_manifest_skill_name(data["name"], source)
+    config_fields = _parse_config_fields(data, source)
 
     return ManifestSpec(
         name=skill_name,
@@ -374,6 +466,7 @@ def parse_manifest_yaml(content: str, source: str = "<string>") -> ManifestSpec:
         author=str(data["author"]),
         requires=_parse_manifest_string_list(data, "requires", source),
         class_name=str(data.get("class_name", "")),
+        config_fields=config_fields,
     )
 
 

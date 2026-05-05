@@ -70,7 +70,10 @@ class ClipboardTool:
         if is_windows():
             try:
                 subprocess.run(
-                    ["powershell", "-NoProfile", "-Command", "Set-Clipboard", "-Value", text],
+                    [
+                        "powershell", "-NoProfile", "-Command",
+                        "Set-Clipboard", "-Value", text,
+                    ],
                     capture_output=True,
                     text=True,
                     timeout=1.0,
