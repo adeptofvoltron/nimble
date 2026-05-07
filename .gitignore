@@ -1,6 +1,7 @@
 .idea
 .cursor
 .claude
+CLAUDE.md
 _bmad
 
 # Local configuration — copy config.yaml.example to config.yaml to get started
