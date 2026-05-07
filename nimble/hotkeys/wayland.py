@@ -52,7 +52,11 @@ class WaylandXWaylandAdapter(X11HotkeyAdapter):
             ) from exc
         self._keepalive_display = d
         self._keepalive_win = win
-        super().start()
+        try:
+            super().start()
+        except Exception:
+            self.stop()
+            raise
 
     def stop(self) -> None:
         super().stop()

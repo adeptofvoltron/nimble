@@ -81,6 +81,24 @@ def test_stop_before_start_is_noop() -> None:
     adapter.stop()
 
 
+def test_start_cleans_up_if_listener_fails() -> None:
+    adapter = WaylandXWaylandAdapter()
+    mock_win, mock_disp, mock_display_mod, mock_X, mock_keyboard = _make_mocks()
+    mock_keyboard.GlobalHotKeys.return_value.start.side_effect = RuntimeError("pynput failed")
+
+    with (
+        patch("nimble.hotkeys.wayland._xlib_display", return_value=mock_display_mod),
+        patch("nimble.hotkeys.wayland._xlib_x", return_value=mock_X),
+        patch("nimble.hotkeys.x11._pynput_keyboard", return_value=mock_keyboard),
+        patch.dict(os.environ, {"DISPLAY": ":0", "WAYLAND_DISPLAY": "wayland-0"}),
+    ):
+        with pytest.raises(RuntimeError, match="pynput failed"):
+            adapter.start()
+
+    mock_win.destroy.assert_called_once()
+    mock_disp.close.assert_called_once()
+
+
 def test_register_duplicate_raises_value_error() -> None:
     adapter = WaylandXWaylandAdapter()
     adapter.register("ctrl+shift+h", lambda: None)
