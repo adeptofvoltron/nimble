@@ -13,6 +13,7 @@ dependencies = [
     "pyyaml>=6.0",
     "plyer>=2.1",
     "watchdog>=3.0",
+    "evdev>=1.6.1; sys_platform=='linux'",
 ]
 
 [project.optional-dependencies]
