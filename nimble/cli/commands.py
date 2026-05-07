@@ -168,6 +168,24 @@ def _do_stop() -> bool:
 
 
 def _do_start(repo_root: Path, debug: bool) -> int | None:
+    config_path = repo_root / "config.yaml"
+    if not config_path.exists():
+        import yaml
+
+        from nimble.manifest.parser import atomic_write
+
+        try:
+            atomic_write(
+                config_path,
+                yaml.dump(
+                    {"skills": []}, default_flow_style=False, allow_unicode=True
+                ),
+            )
+        except OSError as exc:
+            typer.echo(f"Failed to create config.yaml: {exc}", err=True)
+            raise typer.Exit(1)
+        typer.echo("config.yaml not found — created a new one.")
+
     nimble_bin = Path(sys.executable).parent / (
         "nimble.exe" if is_windows() else "nimble"
     )

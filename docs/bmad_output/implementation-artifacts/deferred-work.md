@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: nimble start config auto-create (2026-05-07)
+
+- `nimble/cli/commands.py:_repo_root()`: derives repo root from `Path(__file__).resolve().parent.parent.parent` (the installed package location), not from CWD or a git root. On a system-wide or pipx install, `config.yaml` is created inside the read-only package directory rather than the user's project. Pre-existing across all commands; resolve with a proper CWD-or-git-root detection strategy.
+
 ## Deferred from: config.yaml gitignore + auto-create (2026-05-07)
 
 - `nimble/manifest/parser.py` + `nimble/manifest/lock.py`: rollback path (`remove_skill_entry_from_config`) does not delete `config.yaml` if it was created from scratch by `append_skill_to_config`; on `write_lock_entry` failure the rollback removes the skill entry but leaves an empty `config.yaml` behind. Fix: track whether the file was newly created and delete it on full rollback.
