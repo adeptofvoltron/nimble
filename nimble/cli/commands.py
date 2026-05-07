@@ -418,6 +418,7 @@ def add(
         raise typer.Exit(1)
 
     config_path = repo_root / "config.yaml"
+    config_is_new = not config_path.exists()
     try:
         append_skill_to_config(
             config_path, spec, shortcut, repo_url, repo_root, configuration
@@ -446,6 +447,8 @@ def add(
         )
         raise typer.Exit(1)
 
+    if config_is_new:
+        typer.echo("config.yaml not found — created a new one.")
     typer.echo(f"Skill '{spec.name}' installed and bound to {shortcut}.")
 
 

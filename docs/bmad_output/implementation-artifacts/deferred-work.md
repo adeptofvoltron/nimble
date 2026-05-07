@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: config.yaml gitignore + auto-create (2026-05-07)
+
+- `nimble/manifest/parser.py` + `nimble/manifest/lock.py`: rollback path (`remove_skill_entry_from_config`) does not delete `config.yaml` if it was created from scratch by `append_skill_to_config`; on `write_lock_entry` failure the rollback removes the skill entry but leaves an empty `config.yaml` behind. Fix: track whether the file was newly created and delete it on full rollback.
+- `README.md` quick-start: does not mention copying `config.yaml.example` → `config.yaml` before running `nimble start`; `load_config` will raise an unhandled `FileNotFoundError` (not a `ConfigError`) producing a raw Python traceback. Fix: add setup step to README, and wrap the `open()` call in `load_config` with an `OSError` handler that raises a clean `ConfigError`.
+- `.gitignore`: `.nimble` is listed twice — as `.nimble/*` (with `!.nimble/manifest.lock` negation) and again as a bare `.nimble` on the last line; the bare entry is redundant and could shadow the negation on some git versions. Remove the bare `.nimble` line in a cleanup pass.
+
 ## Deferred from: spec-fix-skill-module-path-absolute (2026-05-04)
 
 - `nimble/skills/runner.py:137` + `nimble/skills/loader.py` (`validate_skill_paths`): both use `repo_root / config.path` without guarding against absolute paths or `..` traversal in `config.path`. Config is currently trusted, but worth hardening in a validation pass (e.g. assert path is relative and stays within repo_root after `.resolve()`).

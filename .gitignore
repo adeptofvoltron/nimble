@@ -3,6 +3,9 @@
 .claude
 _bmad
 
+# Local configuration — copy config.yaml.example to config.yaml to get started
+config.yaml
+
 # Tool-managed runtime dir — gitignored EXCEPT manifest.lock
 .nimble/*
 !.nimble/manifest.lock

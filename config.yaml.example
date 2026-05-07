@@ -1,0 +1,10 @@
+ai:
+  api_key_env: ANTHROPIC_API_KEY
+  model: claude-sonnet-4-6
+  provider: anthropic
+skills:
+- binding: ctrl+l
+  class_name: HelloWorldSkill
+  name: hello_world
+  path: skills/hello_world/skill.py
+  source: local

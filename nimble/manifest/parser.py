@@ -245,12 +245,11 @@ def append_skill_to_config(
         )
     try:
         with config_path.open(encoding="utf-8") as f:
-            raw = yaml.safe_load(f)
+            raw: dict[str, Any] = yaml.safe_load(f) or {}
+    except FileNotFoundError:
+        raw = {}
     except (OSError, yaml.YAMLError) as exc:
         raise ConfigError(f"Failed to read config.yaml: {exc}") from exc
-
-    if raw is None:
-        raw = {}
 
     skills = raw.get("skills", [])
     if not isinstance(skills, list):
