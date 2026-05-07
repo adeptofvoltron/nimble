@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from nimble.manifest.lock import read_lock, write_lock_entry
+from nimble.manifest.lock import read_lock, remove_lock_entry, write_lock_entry
 
 
 def test_read_lock_missing_file(tmp_path: Path) -> None:
@@ -58,3 +58,28 @@ def test_write_lock_entry_creates_nimble_dir(tmp_path: Path) -> None:
     assert lock_path.exists()
     data = yaml.safe_load(lock_path.read_text(encoding="utf-8"))
     assert "my-skill" in data["skills"]
+
+
+def test_remove_lock_entry_removes_named_key(tmp_path: Path) -> None:
+    lock_path = tmp_path / "manifest.lock"
+    write_lock_entry(lock_path, "skill-a", "https://github.com/u/a", "1.0.0")
+    write_lock_entry(lock_path, "skill-b", "https://github.com/u/b", "2.0.0")
+    remove_lock_entry(lock_path, "skill-a")
+    data = yaml.safe_load(lock_path.read_text(encoding="utf-8"))
+    assert "skill-a" not in data["skills"]
+    assert "skill-b" in data["skills"]
+
+
+def test_remove_lock_entry_missing_key_is_noop(tmp_path: Path) -> None:
+    lock_path = tmp_path / "manifest.lock"
+    write_lock_entry(lock_path, "skill-b", "https://github.com/u/b", "2.0.0")
+    remove_lock_entry(lock_path, "skill-a")
+    data = yaml.safe_load(lock_path.read_text(encoding="utf-8"))
+    assert "skill-b" in data["skills"]
+
+
+def test_remove_lock_entry_missing_file_is_noop(tmp_path: Path) -> None:
+    lock_path = tmp_path / "manifest.lock"
+    assert not lock_path.exists()
+    remove_lock_entry(lock_path, "skill-a")
+    assert not lock_path.exists()

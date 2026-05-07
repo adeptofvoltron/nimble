@@ -304,6 +304,34 @@ def remove_skill_entry_from_config(config_path: Path, skill_name: str) -> None:
     )
 
 
+def remove_skill_from_config(config_path: Path, skill_name: str) -> None:
+    """Remove all skills[] entries whose name matches (user-facing uninstall)."""
+    try:
+        with config_path.open(encoding="utf-8") as f:
+            raw = yaml.safe_load(f)
+    except (OSError, yaml.YAMLError) as exc:
+        raise ConfigError(f"Failed to read config.yaml: {exc}") from exc
+
+    if raw is None:
+        raise ConfigError(f"Skill {skill_name!r} not found in config.yaml")
+
+    skills = raw.get("skills", [])
+    if not isinstance(skills, list):
+        raise ConfigError("config.yaml 'skills' is not a list")
+
+    updated = [
+        e for e in skills if not (isinstance(e, dict) and e.get("name") == skill_name)
+    ]
+    if len(updated) == len(skills):
+        raise ConfigError(f"Skill {skill_name!r} not found in config.yaml")
+
+    raw["skills"] = updated
+    atomic_write(
+        config_path,
+        yaml.dump(raw, default_flow_style=False, allow_unicode=True),
+    )
+
+
 def read_skill_manifest(config: SkillConfig, base_path: Path) -> dict[str, Any] | None:
     base_root = base_path.resolve()
     skill_path = Path(config.path)
