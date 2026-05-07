@@ -11,15 +11,10 @@ def get_adapter() -> HotkeyAdapter:
     if is_linux():
         wayland = os.environ.get("WAYLAND_DISPLAY")
         display = os.environ.get("DISPLAY")
-        if wayland and not display:
-            raise RuntimeError(
-                "Nimble requires XWayland on pure Wayland sessions. "
-                "Install XWayland or set DISPLAY to your X11 display."
-            )
-        if wayland and display:
-            from nimble.hotkeys.wayland import WaylandXWaylandAdapter
+        if wayland or not display:
+            from nimble.hotkeys.evdev_adapter import EvdevAdapter
 
-            return WaylandXWaylandAdapter()
+            return EvdevAdapter()
         from nimble.hotkeys.x11 import X11HotkeyAdapter
 
         return X11HotkeyAdapter()
