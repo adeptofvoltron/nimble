@@ -59,7 +59,9 @@ def _shortcut_token_to_ecode(token: str) -> int:
 
 
 def _parse_shortcut(shortcut: str) -> tuple[frozenset[str], int]:
+    _aliases = {"cmd": "super", "win": "super"}
     parts = shortcut.lower().split("+")
+    parts = [_aliases.get(p, p) for p in parts]
     mods = frozenset(p for p in parts if p in _MODIFIERS)
     non_mods = [p for p in parts if p not in _MODIFIERS]
     if len(non_mods) != 1:
@@ -79,6 +81,8 @@ class EvdevAdapter(HotkeyAdapter):
         self._lock = threading.Lock()
 
     def register(self, shortcut: str, callback: Callable[[], None]) -> None:
+        if self._thread is not None:
+            raise RuntimeError("Cannot register hotkeys after start(); call stop() first.")
         if shortcut in self._hotkeys:
             raise ValueError(f"Hotkey already registered: {shortcut!r}")
         mods, trigger_ecode = _parse_shortcut(shortcut)

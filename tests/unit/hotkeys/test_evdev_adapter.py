@@ -132,10 +132,11 @@ def test_run_loop_fires_callback_on_matching_hotkey() -> None:
 
     select_results = iter([([5], [], []), ([pipe_r], [], [])])
     with patch("select.select", side_effect=lambda *a, **kw: next(select_results)):
-        adapter._run_loop([mock_dev], modifier_map)
-
-    os.close(pipe_r)
-    os.close(pipe_w)
+        try:
+            adapter._run_loop([mock_dev], modifier_map)
+        finally:
+            os.close(pipe_r)
+            os.close(pipe_w)
     fired.wait(timeout=2)
     assert fired.is_set()
 
@@ -169,8 +170,9 @@ def test_run_loop_does_not_fire_with_wrong_modifiers() -> None:
 
     select_results = iter([([5], [], []), ([pipe_r], [], [])])
     with patch("select.select", side_effect=lambda *a, **kw: next(select_results)):
-        adapter._run_loop([mock_dev], modifier_map)
-
-    os.close(pipe_r)
-    os.close(pipe_w)
+        try:
+            adapter._run_loop([mock_dev], modifier_map)
+        finally:
+            os.close(pipe_r)
+            os.close(pipe_w)
     assert not fired.is_set()
