@@ -11,7 +11,7 @@ class AiTool:
     def __init__(self, config: AiConfig | None) -> None:
         self._config = config
 
-    def ask(self, text: str, prompt: str | None = None) -> str:
+    def ask(self, text: str, system_prompt: str | None = None) -> str:
         if self._config is None:
             raise RuntimeError("AI not configured: add an 'ai' block to config.yaml")
         api_key = os.environ.get(self._config.api_key_env)
@@ -21,15 +21,15 @@ class AiTool:
                 " is empty or unset"
             )
         if self._config.provider == "anthropic":
-            return self._ask_anthropic(text, prompt, api_key)
+            return self._ask_anthropic(text, system_prompt, api_key)
         if self._config.provider == "openai":
-            return self._ask_openai(text, prompt, api_key)
+            return self._ask_openai(text, system_prompt, api_key)
         raise RuntimeError(
             f"Unsupported AI provider: {self._config.provider!r}."
             " Supported: anthropic, openai"
         )
 
-    def _ask_anthropic(self, text: str, prompt: str | None, api_key: str) -> str:
+    def _ask_anthropic(self, text: str, system_prompt: str | None, api_key: str) -> str:
         try:
             import anthropic
         except ImportError:
@@ -43,12 +43,12 @@ class AiTool:
             "max_tokens": 1024,
             "messages": [{"role": "user", "content": text}],
         }
-        if prompt is not None:
-            kwargs["system"] = prompt
+        if system_prompt is not None:
+            kwargs["system"] = system_prompt
         response = client.messages.create(**kwargs)
         return str(response.content[0].text)
 
-    def _ask_openai(self, text: str, prompt: str | None, api_key: str) -> str:
+    def _ask_openai(self, text: str, system_prompt: str | None, api_key: str) -> str:
         try:
             import openai
         except ImportError:
@@ -58,8 +58,8 @@ class AiTool:
             )
         client = openai.OpenAI(api_key=api_key)
         messages: list[dict[str, str]] = []
-        if prompt is not None:
-            messages.append({"role": "system", "content": prompt})
+        if system_prompt is not None:
+            messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": text})
         response = client.chat.completions.create(
             model=self._config.model,  # type: ignore[union-attr]
