@@ -13,12 +13,6 @@ nimble start
 
 Right after `nimble start`, you should see a notification titled **Nimble** with the body **Nimble daemon running.** (startup confirmation, FR41).
 
-Press **`ctrl+l`** — another notification appears:
-
-> **Hello from Nimble! The daemon is working.**
-
-That's the bundled `hello_world` skill confirming hotkeys are wired (see `config.yaml`).
-
 To stop:
 
 ```bash
