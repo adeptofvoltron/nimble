@@ -176,3 +176,27 @@ def test_run_loop_does_not_fire_with_wrong_modifiers() -> None:
             os.close(pipe_r)
             os.close(pipe_w)
     assert not fired.is_set()
+
+
+def test_register_after_start_succeeds_and_fires() -> None:
+    mock_evdev = _make_mock_evdev()
+    mock_evdev.ecodes.ecodes = ecodes.ecodes
+    mock_evdev.events.KeyEvent.key_down = 1
+    mock_evdev.events.KeyEvent.key_up = 0
+    stop_event = threading.Event()
+
+    def fake_select(rlist, wlist, xlist, *args, **kwargs):
+        stop_event.wait(timeout=5)
+        return ([rlist[-1]], [], [])
+
+    adapter = EvdevAdapter()
+    fired = threading.Event()
+
+    with patch("nimble.hotkeys.evdev_adapter._evdev", return_value=mock_evdev):
+        with patch("select.select", side_effect=fake_select):
+            adapter.start()
+            adapter.register("ctrl+l", fired.set)
+            stop_event.set()
+            adapter.stop()
+
+    assert "ctrl+l" in adapter._hotkeys

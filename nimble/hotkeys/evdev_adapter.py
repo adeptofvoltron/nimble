@@ -81,12 +81,11 @@ class EvdevAdapter(HotkeyAdapter):
         self._lock = threading.Lock()
 
     def register(self, shortcut: str, callback: Callable[[], None]) -> None:
-        if self._thread is not None:
-            raise RuntimeError("Cannot register hotkeys after start(); call stop() first.")
-        if shortcut in self._hotkeys:
-            raise ValueError(f"Hotkey already registered: {shortcut!r}")
         mods, trigger_ecode = _parse_shortcut(shortcut)
-        self._hotkeys[shortcut] = (mods, trigger_ecode, callback)
+        with self._lock:
+            if shortcut in self._hotkeys:
+                raise ValueError(f"Hotkey already registered: {shortcut!r}")
+            self._hotkeys[shortcut] = (mods, trigger_ecode, callback)
 
     def start(self) -> None:
         if self._thread is not None:
@@ -184,12 +183,13 @@ class EvdevAdapter(HotkeyAdapter):
                             elif value == KEY_DOWN:
                                 with self._lock:
                                     active_mods = frozenset(self._current_modifiers)
-                                for _shortcut, (req_mods, trigger_ecode, cb) in self._hotkeys.items():
+                                    hotkeys_snapshot = list(self._hotkeys.items())
+                                for shortcut, (req_mods, trigger_ecode, cb) in hotkeys_snapshot:
                                     if code == trigger_ecode and active_mods == req_mods:
                                         threading.Thread(
                                             target=cb,
                                             daemon=True,
-                                            name=f"nimble-hotkey-{_shortcut}",
+                                            name=f"nimble-hotkey-{shortcut}",
                                         ).start()
                     except BlockingIOError:
                         pass
