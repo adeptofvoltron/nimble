@@ -14,8 +14,7 @@ from nimble.hotkeys.x11 import X11HotkeyAdapter
 
 def test_get_adapter_returns_x11_on_pure_x11() -> None:
     with patch.object(sys, "platform", "linux"):
-        with patch.dict(os.environ, {"DISPLAY": ":0"}, clear=False):
-            os.environ.pop("WAYLAND_DISPLAY", None)
+        with patch.dict(os.environ, {"DISPLAY": ":0", "WAYLAND_DISPLAY": ""}, clear=False):
             adapter = get_adapter()
     assert isinstance(adapter, X11HotkeyAdapter)
     assert not isinstance(adapter, WaylandXWaylandAdapter)
@@ -32,8 +31,7 @@ def test_get_adapter_returns_wayland_adapter_on_xwayland() -> None:
 
 def test_get_adapter_raises_on_pure_wayland_no_display() -> None:
     with patch.object(sys, "platform", "linux"):
-        with patch.dict(os.environ, {"WAYLAND_DISPLAY": "wayland-0"}, clear=False):
-            os.environ.pop("DISPLAY", None)
+        with patch.dict(os.environ, {"WAYLAND_DISPLAY": "wayland-0", "DISPLAY": ""}, clear=False):
             with pytest.raises(RuntimeError, match="XWayland"):
                 get_adapter()
 
