@@ -46,3 +46,10 @@ def test_get_adapter_raises_on_unsupported_platform() -> None:
     with patch.object(sys, "platform", "darwin"):
         with pytest.raises(RuntimeError, match="Unsupported platform: darwin"):
             get_adapter()
+
+
+def test_get_adapter_returns_evdev_on_headless() -> None:
+    with patch.object(sys, "platform", "linux"):
+        with patch.dict(os.environ, {"DISPLAY": "", "WAYLAND_DISPLAY": ""}, clear=False):
+            adapter = get_adapter()
+    assert isinstance(adapter, EvdevAdapter)
