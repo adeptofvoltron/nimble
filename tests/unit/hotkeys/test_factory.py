@@ -1,17 +1,41 @@
+from __future__ import annotations
+
+import os
 import sys
 from unittest.mock import patch
 
 import pytest
 
 from nimble.hotkeys import get_adapter
+from nimble.hotkeys.wayland import WaylandXWaylandAdapter
 from nimble.hotkeys.windows import WindowsHotkeyAdapter
 from nimble.hotkeys.x11 import X11HotkeyAdapter
 
 
-def test_get_adapter_returns_x11_on_linux() -> None:
+def test_get_adapter_returns_x11_on_pure_x11() -> None:
     with patch.object(sys, "platform", "linux"):
-        adapter = get_adapter()
+        with patch.dict(os.environ, {"DISPLAY": ":0"}, clear=False):
+            os.environ.pop("WAYLAND_DISPLAY", None)
+            adapter = get_adapter()
     assert isinstance(adapter, X11HotkeyAdapter)
+    assert not isinstance(adapter, WaylandXWaylandAdapter)
+
+
+def test_get_adapter_returns_wayland_adapter_on_xwayland() -> None:
+    with patch.object(sys, "platform", "linux"):
+        with patch.dict(
+            os.environ, {"DISPLAY": ":0", "WAYLAND_DISPLAY": "wayland-0"}
+        ):
+            adapter = get_adapter()
+    assert isinstance(adapter, WaylandXWaylandAdapter)
+
+
+def test_get_adapter_raises_on_pure_wayland_no_display() -> None:
+    with patch.object(sys, "platform", "linux"):
+        with patch.dict(os.environ, {"WAYLAND_DISPLAY": "wayland-0"}, clear=False):
+            os.environ.pop("DISPLAY", None)
+            with pytest.raises(RuntimeError, match="XWayland"):
+                get_adapter()
 
 
 def test_get_adapter_returns_windows_on_win32() -> None:
