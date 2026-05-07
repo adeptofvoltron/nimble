@@ -33,3 +33,14 @@ def write_lock_entry(
         {"skills": skills}, default_flow_style=False, allow_unicode=True
     )
     atomic_write(lock_path, content)
+
+
+def remove_lock_entry(lock_path: Path, skill_name: str) -> None:
+    skills = read_lock(lock_path)
+    if skill_name not in skills:
+        return
+    del skills[skill_name]
+    atomic_write(
+        lock_path,
+        yaml.dump({"skills": skills}, default_flow_style=False, allow_unicode=True),
+    )

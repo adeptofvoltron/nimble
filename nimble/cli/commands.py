@@ -470,5 +470,61 @@ def add(
     typer.echo(f"Skill '{spec.name}' installed and bound to {shortcut}.")
 
 
+@app.command()
+def remove(
+    skill_name: str = typer.Argument(..., help="Name of the skill to remove"),
+) -> None:
+    """Remove a skill installed via nimble add."""
+    from nimble.manifest.lock import remove_lock_entry
+    from nimble.manifest.parser import ConfigError, remove_skill_from_config
+
+    typer.echo(f"Remove skill '{skill_name}'? [y/N]: ", nl=False)
+    try:
+        line = sys.stdin.readline()
+    except (OSError, UnicodeDecodeError):
+        typer.echo("Removal cancelled.")
+        raise typer.Exit(0)
+    if line.rstrip("\r\n") not in ("y", "Y"):
+        typer.echo("Removal cancelled.")
+        raise typer.Exit(0)
+
+    repo_root = _repo_root()
+    config_path = repo_root / "config.yaml"
+    lock_path = repo_root / ".nimble" / "manifest.lock"
+    skill_dir = repo_root / ".nimble" / "skills" / skill_name
+
+    try:
+        remove_skill_from_config(config_path, skill_name)
+    except ConfigError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1)
+    except OSError as exc:
+        typer.echo(f"Failed to update config.yaml: {exc}", err=True)
+        raise typer.Exit(1)
+
+    try:
+        remove_lock_entry(lock_path, skill_name)
+    except OSError as exc:
+        typer.echo(f"Warning: failed to update manifest.lock: {exc}", err=True)
+
+    if skill_dir.exists():
+        import shutil
+
+        try:
+            shutil.rmtree(skill_dir)
+        except OSError as exc:
+            typer.echo(f"Warning: failed to delete skill directory: {exc}", err=True)
+    else:
+        typer.echo("Skill directory not found — skipping.")
+
+    typer.echo(f"Skill '{skill_name}' removed.")
+
+    pid = state.read_pid()
+    if pid is not None and state.is_running(pid):
+        typer.echo(
+            "Nimble is running — restart with 'nimble restart' to apply changes."
+        )
+
+
 if __name__ == "__main__":
     app()

@@ -756,6 +756,104 @@ def test_add_config_field_trims_allowed_value_whitespace() -> None:
     assert configuration == {"target_language": "es"}
 
 
+def test_remove_happy_path(tmp_path: Path) -> None:
+    skill_dir = tmp_path / ".nimble" / "skills" / "my-skill"
+    skill_dir.mkdir(parents=True)
+    with (
+        patch("nimble.cli.commands._repo_root", return_value=tmp_path),
+        patch("nimble.manifest.parser.remove_skill_from_config"),
+        patch("nimble.manifest.lock.remove_lock_entry"),
+        patch("nimble.cli.commands.state.read_pid", return_value=None),
+    ):
+        result = runner.invoke(app, ["remove", "my-skill"], input="y\n")
+    assert result.exit_code == 0
+    assert "removed" in result.output
+    assert not skill_dir.exists()
+
+
+def test_remove_confirmation_declined(tmp_path: Path) -> None:
+    with (
+        patch("nimble.cli.commands._repo_root", return_value=tmp_path),
+        patch(
+            "nimble.manifest.parser.remove_skill_from_config"
+        ) as mock_rm,
+    ):
+        result = runner.invoke(app, ["remove", "my-skill"], input="n\n")
+    assert result.exit_code == 0
+    assert "cancelled" in result.output
+    mock_rm.assert_not_called()
+
+
+def test_remove_confirmation_empty_declines(tmp_path: Path) -> None:
+    with (
+        patch("nimble.cli.commands._repo_root", return_value=tmp_path),
+        patch(
+            "nimble.manifest.parser.remove_skill_from_config"
+        ) as mock_rm,
+    ):
+        result = runner.invoke(app, ["remove", "my-skill"], input="\n")
+    assert result.exit_code == 0
+    assert "cancelled" in result.output
+    mock_rm.assert_not_called()
+
+
+def test_remove_skill_not_in_config(tmp_path: Path) -> None:
+    with (
+        patch("nimble.cli.commands._repo_root", return_value=tmp_path),
+        patch(
+            "nimble.manifest.parser.remove_skill_from_config",
+            side_effect=ConfigError("Skill 'my-skill' not found in config.yaml"),
+        ),
+    ):
+        result = runner.invoke(app, ["remove", "my-skill"], input="y\n")
+    assert result.exit_code == 1
+    assert "not found" in result.output
+
+
+def test_remove_dir_absent_warns_and_succeeds(tmp_path: Path) -> None:
+    with (
+        patch("nimble.cli.commands._repo_root", return_value=tmp_path),
+        patch("nimble.manifest.parser.remove_skill_from_config"),
+        patch("nimble.manifest.lock.remove_lock_entry"),
+        patch("nimble.cli.commands.state.read_pid", return_value=None),
+    ):
+        result = runner.invoke(app, ["remove", "my-skill"], input="y\n")
+    assert result.exit_code == 0
+    assert "directory not found" in result.output
+    assert "removed" in result.output
+
+
+def test_remove_lock_oserror_warns_but_succeeds(tmp_path: Path) -> None:
+    skill_dir = tmp_path / ".nimble" / "skills" / "my-skill"
+    skill_dir.mkdir(parents=True)
+    with (
+        patch("nimble.cli.commands._repo_root", return_value=tmp_path),
+        patch("nimble.manifest.parser.remove_skill_from_config"),
+        patch(
+            "nimble.manifest.lock.remove_lock_entry",
+            side_effect=OSError("disk full"),
+        ),
+        patch("nimble.cli.commands.state.read_pid", return_value=None),
+    ):
+        result = runner.invoke(app, ["remove", "my-skill"], input="y\n")
+    assert result.exit_code == 0
+    assert "manifest.lock" in result.output
+    assert "removed" in result.output
+
+
+def test_remove_daemon_running_shows_restart_hint(tmp_path: Path) -> None:
+    with (
+        patch("nimble.cli.commands._repo_root", return_value=tmp_path),
+        patch("nimble.manifest.parser.remove_skill_from_config"),
+        patch("nimble.manifest.lock.remove_lock_entry"),
+        patch("nimble.cli.commands.state.read_pid", return_value=12345),
+        patch("nimble.cli.commands.state.is_running", return_value=True),
+    ):
+        result = runner.invoke(app, ["remove", "my-skill"], input="y\n")
+    assert result.exit_code == 0
+    assert "restart" in result.output
+
+
 def test_terminate_windows_openprocess_failure_raises() -> None:
     fake_kernel32 = MagicMock()
     fake_kernel32.OpenProcess.return_value = 0

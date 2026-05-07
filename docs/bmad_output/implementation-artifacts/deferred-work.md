@@ -1,5 +1,10 @@
 # Deferred Work
 
+## Deferred from: add-nimble-remove-command (2026-05-07)
+
+- `nimble/cli/commands.py:remove` + `nimble/manifest/installer.py`: skill directory path is constructed from an unvalidated name (`repo_root / ".nimble" / "skills" / skill_name`) — a malicious manifest with `name: "../../etc"` could cause `nimble add` to clone and `nimble remove` to delete outside `.nimble/skills/`. The `remove` command is gated by `remove_skill_from_config` (name must be in config.yaml), but the underlying path is not asserted to resolve within the expected subtree. Harden by resolving `skill_dir` and asserting it is relative to `repo_root / ".nimble" / "skills"` in both `add` and `remove`.
+- `nimble/manifest/parser.py:remove_skill_from_config` + `remove_skill_entry_from_config`: both assume `yaml.safe_load` returns a `dict` (call `.get(...)` directly after a `None` check), but a valid YAML file containing a top-level list or scalar raises `AttributeError` instead of a clean `ConfigError`. Pre-existing pattern; fix with `if not isinstance(raw, dict): raise ConfigError(...)` in a parser-hardening pass.
+
 ## Deferred from: nimble start config auto-create (2026-05-07)
 
 - `nimble/cli/commands.py:_repo_root()`: derives repo root from `Path(__file__).resolve().parent.parent.parent` (the installed package location), not from CWD or a git root. On a system-wide or pipx install, `config.yaml` is created inside the read-only package directory rather than the user's project. Pre-existing across all commands; resolve with a proper CWD-or-git-root detection strategy.
