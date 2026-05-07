@@ -1,4 +1,4 @@
-# Nimble
+![Nimble](docs/logo.png)
 
 A lightweight hotkey daemon that fires Python skills on demand — capturing clipboard, selection, active app, and mouse position at the moment you press a key.
 
