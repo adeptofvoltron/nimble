@@ -304,6 +304,7 @@ name = "nimble"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "evdev", marker = "sys_platform == 'linux'" },
     { name = "plyer" },
     { name = "pynput" },
     { name = "pyyaml" },
@@ -323,6 +324,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = "==26.3.1" },
+    { name = "evdev", marker = "sys_platform == 'linux'", specifier = ">=1.6.1" },
     { name = "flake8", marker = "extra == 'dev'", specifier = "==7.3.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.20.1" },
     { name = "plyer", specifier = ">=2.1" },
