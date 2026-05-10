@@ -21,3 +21,4 @@ build/
 
 .nimble
 config.yaml
+.env
