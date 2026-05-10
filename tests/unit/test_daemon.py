@@ -160,12 +160,14 @@ def test_run_exits_on_adapter_start_runtime_error(tmp_path: Path) -> None:
         patch("nimble.daemon.Notifier", return_value=fake_notifier),
         patch("nimble.daemon.configure_logging"),
         patch("nimble.daemon.SkillRunner"),
+        patch("nimble.daemon.write_pid") as mock_write_pid,
         pytest.raises(SystemExit) as exc_info,
     ):
         from nimble.daemon import run
 
         run(tmp_path)
     assert exc_info.value.code == 1
+    mock_write_pid.assert_not_called()
 
 
 def test_run_sends_notification_on_adapter_start_runtime_error(tmp_path: Path) -> None:
@@ -187,6 +189,48 @@ def test_run_sends_notification_on_adapter_start_runtime_error(tmp_path: Path) -
     assert len(fake_notifier.sent) == 1
     _, body = fake_notifier.sent[0]
     assert "XWayland not found" in body
+
+
+def test_run_exits_on_adapter_start_import_error(tmp_path: Path) -> None:
+    fake_notifier = FakeNotifier()
+    mock_adapter = MagicMock()
+    mock_adapter.start.side_effect = ImportError("No module named 'pynput'")
+    with (
+        patch("nimble.daemon.load_config", return_value=MagicMock(skills=[], ai=None)),
+        patch("nimble.daemon.validate_skill_paths", return_value=[]),
+        patch("nimble.daemon.get_adapter", return_value=mock_adapter),
+        patch("nimble.daemon.Notifier", return_value=fake_notifier),
+        patch("nimble.daemon.configure_logging"),
+        patch("nimble.daemon.SkillRunner"),
+        patch("nimble.daemon.write_pid") as mock_write_pid,
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        from nimble.daemon import run
+
+        run(tmp_path)
+    assert exc_info.value.code == 1
+    mock_write_pid.assert_not_called()
+
+
+def test_run_sends_notification_on_adapter_start_import_error(tmp_path: Path) -> None:
+    fake_notifier = FakeNotifier()
+    mock_adapter = MagicMock()
+    mock_adapter.start.side_effect = ImportError("No module named 'pynput'")
+    with (
+        patch("nimble.daemon.load_config", return_value=MagicMock(skills=[], ai=None)),
+        patch("nimble.daemon.validate_skill_paths", return_value=[]),
+        patch("nimble.daemon.get_adapter", return_value=mock_adapter),
+        patch("nimble.daemon.Notifier", return_value=fake_notifier),
+        patch("nimble.daemon.configure_logging"),
+        patch("nimble.daemon.SkillRunner"),
+        pytest.raises(SystemExit),
+    ):
+        from nimble.daemon import run
+
+        run(tmp_path)
+    assert len(fake_notifier.sent) == 1
+    _, body = fake_notifier.sent[0]
+    assert "pynput" in body
 
 
 def test_run_writes_state_on_startup(tmp_path: Path) -> None:
