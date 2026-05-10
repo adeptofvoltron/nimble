@@ -157,7 +157,12 @@ def _do_stop() -> bool:
             )
             return False
 
-    for _ in range(100):
+    raw_state = state.read_state()
+    n_skills = len(raw_state.get("skills", [])) if raw_state else 0
+    # 5s per worker + 1s buffer, expressed as 0.1s ticks; minimum 100 ticks (10s)
+    stop_polls = max(100, n_skills * 60)
+
+    for _ in range(stop_polls):
         time.sleep(0.1)
         if not state.is_running(pid):
             state.remove_pid()
