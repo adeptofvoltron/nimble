@@ -138,12 +138,27 @@ def _extract_error(exc: BaseException) -> dict[str, Any]:
 
 def run(module_path: str, class_name: str) -> None:
     skill_config: dict[str, object] = {}
+    _raw_skill_cfg = os.environ.get("NIMBLE_SKILL_CONFIG", "") or "{}"
     try:
-        raw_skill_config = json.loads(os.environ.get("NIMBLE_SKILL_CONFIG", "") or "{}")
-        if isinstance(raw_skill_config, dict):
-            skill_config = raw_skill_config
-    except (json.JSONDecodeError, ValueError):
-        pass
+        _parsed_skill_cfg = json.loads(_raw_skill_cfg)
+    except (json.JSONDecodeError, ValueError) as _cfg_exc:
+        sys.stdout.write(
+            json.dumps({
+                "invocation_id": "",
+                "status": "error",
+                "error": {
+                    "type": "ConfigError",
+                    "message": f"Invalid NIMBLE_SKILL_CONFIG: {_cfg_exc}",
+                    "skill_file": "",
+                    "line": 0,
+                },
+            })
+            + "\n"
+        )
+        sys.stdout.flush()
+        return
+    if isinstance(_parsed_skill_cfg, dict):
+        skill_config = _parsed_skill_cfg
 
     try:
         skill_class = _load_skill_class(module_path, class_name)

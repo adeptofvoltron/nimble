@@ -86,9 +86,16 @@ def run(repo_root: Path, debug: bool = False) -> None:
 
     try:
         adapter.start()
-    except RuntimeError as exc:
+    except (RuntimeError, ImportError) as exc:
+        logger.error("Hotkey adapter failed to start: %s", exc)
         notifier.send("Nimble — startup error", str(exc))
         print(str(exc))
+        sys.exit(1)
+    except Exception as exc:
+        msg = f"{type(exc).__name__}: {exc}"
+        logger.exception("Unexpected error starting hotkey adapter")
+        notifier.send("Nimble — startup error", msg)
+        print(msg)
         sys.exit(1)
     write_pid(os.getpid())
     started = True

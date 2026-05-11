@@ -1,5 +1,16 @@
 # Deferred Work
 
+## Deferred from: fix-nimble-skill-config-hard-failure (2026-05-10)
+
+- `worker/entrypoint.py` except clause: `except (json.JSONDecodeError, ValueError)` — `ValueError` is redundant since `JSONDecodeError` is already a subclass. Pre-existing pattern from the original code; clean up in a future hardening pass.
+- `worker/entrypoint.py` startup error shapes: `on_load` error path includes `"phase": "on_load"` key; all other startup error paths (class-load, tools-build, config-parse) omit a `"phase"` key. Inconsistency pre-dates this change; standardise error shape in a future reliability pass.
+
+## Deferred from: nimble-stability-quick-wins (2026-05-10)
+
+- **QW-4** `nimble/daemon.py` ~lines 88–98: Write PID file only after `adapter.start()` fully confirms trigger registration. Currently the PID file can be written before the adapter is done, so the CLI declares "started!" before skills are actually wired. Audit that `adapter.start()` raises on failure (if not, add that), then confirm PID write comes after full adapter init.
+- **QW-1** `nimble/skills/runner.py` `_shutdown_workers()`: Replace sequential for-loop with `ThreadPoolExecutor` — all workers get SIGTERM simultaneously. Total shutdown time = max(individual), not sum. Fixes the math bug where N workers × 5s > CLI's 10s timeout.
+- **QW-2** `nimble/cli/commands.py` ~line 160: Replace hardcoded `range(100)` stop-poll with `n_skills = len(config.skills); stop_polls = max(100, n_skills * 60)` so the CLI timeout scales with skill count.
+
 ## Deferred from: add-nimble-remove-command (2026-05-07)
 
 - `nimble/cli/commands.py:remove` + `nimble/manifest/installer.py`: skill directory path is constructed from an unvalidated name (`repo_root / ".nimble" / "skills" / skill_name`) — a malicious manifest with `name: "../../etc"` could cause `nimble add` to clone and `nimble remove` to delete outside `.nimble/skills/`. The `remove` command is gated by `remove_skill_from_config` (name must be in config.yaml), but the underlying path is not asserted to resolve within the expected subtree. Harden by resolving `skill_dir` and asserting it is relative to `repo_root / ".nimble" / "skills"` in both `add` and `remove`.

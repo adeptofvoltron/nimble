@@ -388,8 +388,14 @@ class SkillRunner:
         self._shutdown_workers(self._registry.all())
 
     def _shutdown_workers(self, workers: list[SkillWorker]) -> None:
-        for worker in workers:
-            self._terminate_worker_process(worker.process)
+        from concurrent.futures import ThreadPoolExecutor, wait as futures_wait
+
+        with ThreadPoolExecutor() as executor:
+            futures = [
+                executor.submit(self._terminate_worker_process, w.process)
+                for w in workers
+            ]
+            futures_wait(futures)
 
     def _terminate_worker_process(self, process: subprocess.Popen[bytes]) -> None:
         if process.poll() is not None:
