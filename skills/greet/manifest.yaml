@@ -6,4 +6,4 @@ entrypoint: skill.py
 class_name: GreetSkill
 permissions: []
 dependencies: []
-author: "Nimble Demo"
+author: "Kotmin"
