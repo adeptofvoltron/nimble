@@ -49,7 +49,8 @@ def _shortcut_token_to_ecode(token: str) -> int:
         "pageup": "KEY_PAGEUP", "pagedown": "KEY_PAGEDOWN",
         "up": "KEY_UP", "down": "KEY_DOWN", "left": "KEY_LEFT", "right": "KEY_RIGHT",
         "minus": "KEY_MINUS", "equal": "KEY_EQUAL", "semicolon": "KEY_SEMICOLON",
-        "comma": "KEY_COMMA", "dot": "KEY_DOT", "period": "KEY_DOT", "slash": "KEY_SLASH",
+        "comma": "KEY_COMMA", "dot": "KEY_DOT", "period": "KEY_DOT",
+                "slash": "KEY_SLASH",
     }
     if token in _special:
         name = _special[token]

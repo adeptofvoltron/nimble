@@ -14,7 +14,9 @@ from nimble.hotkeys.x11 import X11HotkeyAdapter
 
 def test_get_adapter_returns_x11_on_pure_x11() -> None:
     with patch.object(sys, "platform", "linux"):
-        with patch.dict(os.environ, {"DISPLAY": ":0", "WAYLAND_DISPLAY": ""}, clear=False):
+        with patch.dict(os.environ,
+                        {"DISPLAY": ":0", "WAYLAND_DISPLAY": ""},
+                        clear=False):
             adapter = get_adapter()
     assert isinstance(adapter, X11HotkeyAdapter)
     assert not isinstance(adapter, EvdevAdapter)
@@ -31,7 +33,9 @@ def test_get_adapter_returns_evdev_on_xwayland() -> None:
 
 def test_get_adapter_returns_evdev_on_pure_wayland() -> None:
     with patch.object(sys, "platform", "linux"):
-        with patch.dict(os.environ, {"WAYLAND_DISPLAY": "wayland-0", "DISPLAY": ""}, clear=False):
+        with patch.dict(os.environ,
+                        {"WAYLAND_DISPLAY": "wayland-0", "DISPLAY": ""},
+                        clear=False):
             adapter = get_adapter()
     assert isinstance(adapter, EvdevAdapter)
 
@@ -50,6 +54,8 @@ def test_get_adapter_raises_on_unsupported_platform() -> None:
 
 def test_get_adapter_returns_evdev_on_headless() -> None:
     with patch.object(sys, "platform", "linux"):
-        with patch.dict(os.environ, {"DISPLAY": "", "WAYLAND_DISPLAY": ""}, clear=False):
+        with patch.dict(os.environ,
+                        {"DISPLAY": "", "WAYLAND_DISPLAY": ""},
+                        clear=False):
             adapter = get_adapter()
     assert isinstance(adapter, EvdevAdapter)
