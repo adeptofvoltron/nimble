@@ -10,7 +10,9 @@ from evdev import ecodes
 from nimble.hotkeys.evdev_adapter import EvdevAdapter, _parse_shortcut
 
 
-def _make_mock_evdev(keyboard_paths: tuple[str, ...] = ("/dev/input/event0",)) -> MagicMock:
+def _make_mock_evdev(
+    keyboard_paths: tuple[str, ...] = ("/dev/input/event0",),
+) -> MagicMock:
     mock_evdev = MagicMock()
     mock_evdev.ecodes.EV_KEY = ecodes.EV_KEY
     mock_evdev.list_devices.return_value = list(keyboard_paths)

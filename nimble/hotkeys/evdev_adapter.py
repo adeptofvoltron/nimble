@@ -50,7 +50,7 @@ def _shortcut_token_to_ecode(token: str) -> int:
         "up": "KEY_UP", "down": "KEY_DOWN", "left": "KEY_LEFT", "right": "KEY_RIGHT",
         "minus": "KEY_MINUS", "equal": "KEY_EQUAL", "semicolon": "KEY_SEMICOLON",
         "comma": "KEY_COMMA", "dot": "KEY_DOT", "period": "KEY_DOT",
-                "slash": "KEY_SLASH",
+        "slash": "KEY_SLASH",
     }
     if token in _special:
         name = _special[token]
@@ -184,13 +184,13 @@ class EvdevAdapter(HotkeyAdapter):
                             elif value == KEY_DOWN:
                                 with self._lock:
                                     active_mods = frozenset(self._current_modifiers)
-                                    hotkeys_snapshot = list(self._hotkeys.items())
-                                for shortcut, (req_mods, trigger_ecode, cb) in hotkeys_snapshot:
-                                    if code == trigger_ecode and active_mods == req_mods:
+                                    _items = list(self._hotkeys.items())
+                                for _key, (req_mods, ecode, cb) in _items:
+                                    if code == ecode and active_mods == req_mods:
                                         threading.Thread(
                                             target=cb,
                                             daemon=True,
-                                            name=f"nimble-hotkey-{shortcut}",
+                                            name=f"nimble-hotkey-{_key}",
                                         ).start()
                     except BlockingIOError:
                         pass

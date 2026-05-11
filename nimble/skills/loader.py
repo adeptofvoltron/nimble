@@ -19,7 +19,8 @@ def validate_skill_paths(
             skill_path.relative_to(base_root)
         except ValueError:
             raise ConfigError(
-                f"Skill '{config.name}': path '{config.path}' escapes the repository root"
+                f"Skill '{config.name}': path '{config.path}'"
+                " escapes the repository root"
             )
         if not skill_path.exists():
             raise ConfigError(
