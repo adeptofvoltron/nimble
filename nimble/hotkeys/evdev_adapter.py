@@ -32,15 +32,15 @@ def _shortcut_token_to_ecode(token: str) -> int:
     if len(token) == 1 and token.isalpha():
         name = f"KEY_{token.upper()}"
         if name in ec.ecodes:
-            return ec.ecodes[name]
+            return int(ec.ecodes[name])
     if len(token) == 1 and token.isdigit():
         name = f"KEY_{token}"
         if name in ec.ecodes:
-            return ec.ecodes[name]
+            return int(ec.ecodes[name])
     if token.startswith("f") and token[1:].isdigit():
         name = f"KEY_{token.upper()}"
         if name in ec.ecodes:
-            return ec.ecodes[name]
+            return int(ec.ecodes[name])
     _special = {
         "space": "KEY_SPACE", "enter": "KEY_ENTER", "return": "KEY_ENTER",
         "backspace": "KEY_BACKSPACE", "tab": "KEY_TAB", "esc": "KEY_ESC",
@@ -55,7 +55,7 @@ def _shortcut_token_to_ecode(token: str) -> int:
     if token in _special:
         name = _special[token]
         if name in ec.ecodes:
-            return ec.ecodes[name]
+            return int(ec.ecodes[name])
     raise ValueError(f"Cannot map shortcut token {token!r} to an evdev key code.")
 
 
