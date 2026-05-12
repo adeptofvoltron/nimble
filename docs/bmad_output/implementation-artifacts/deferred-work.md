@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: nimble-cross-platform-installer (2026-05-12)
+
+- `install/install.sh` + `install/install.ps1`: SHA256 mismatch error messages do not show the expected/actual hash values — a user cannot distinguish a transient network corruption from a MITM without the hash output. Add hash display in a future installer hardening pass.
+- `install/install.ps1`: If the script is interrupted via Ctrl-C before or during the `try` block, the temp directory in `$env:TEMP` may not be cleaned up (PowerShell `finally` does not run on Ctrl-C). Acceptable for an installer; address with `Register-EngineEvent PowerShell.Exiting` in a future hardening pass.
+- `install/install.sh` + `.github/workflows/release.yml`: Windows SHA256 sidecar file contains only the raw hash (no filename field); `sha256sum -c nimble-windows-x64.exe.sha256` fails on Linux/Mac because the standard format expects `<hash>  <filename>`. Unix sidecars produced by `sha256sum` include the filename. Normalise format in a future release pipeline pass.
+
 ## Deferred from: fix-nimble-skill-config-hard-failure (2026-05-10)
 
 - `worker/entrypoint.py` except clause: `except (json.JSONDecodeError, ValueError)` — `ValueError` is redundant since `JSONDecodeError` is already a subclass. Pre-existing pattern from the original code; clean up in a future hardening pass.
