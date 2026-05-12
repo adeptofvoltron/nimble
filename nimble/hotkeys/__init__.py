@@ -9,15 +9,14 @@ from nimble.platform import is_linux, is_windows
 
 def get_adapter() -> HotkeyAdapter:
     if is_linux():
-        wayland = os.environ.get("WAYLAND_DISPLAY")
         display = os.environ.get("DISPLAY")
-        if wayland or not display:
-            from nimble.hotkeys.evdev_adapter import EvdevAdapter
+        if display:
+            from nimble.hotkeys.x11 import X11HotkeyAdapter
 
-            return EvdevAdapter()
-        from nimble.hotkeys.x11 import X11HotkeyAdapter
+            return X11HotkeyAdapter()
+        from nimble.hotkeys.evdev_adapter import EvdevAdapter
 
-        return X11HotkeyAdapter()
+        return EvdevAdapter()
     elif is_windows():
         from nimble.hotkeys.windows import WindowsHotkeyAdapter
 
