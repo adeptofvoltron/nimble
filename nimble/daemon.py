@@ -28,6 +28,25 @@ from nimble.watcher import ConfigWatcher
 logger = logging.getLogger(__name__)
 
 
+def _load_dotenv(dotenv_path: Path) -> None:
+    if not dotenv_path.exists():
+        return
+    with dotenv_path.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+                value = value[1:-1]
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+
 def _build_skill_states(registry: SkillRegistry) -> list[SkillState]:
     return [
         SkillState(
@@ -51,6 +70,7 @@ def _state_signature(
 
 
 def run(repo_root: Path, debug: bool = False) -> None:
+    _load_dotenv(repo_root / ".env")
     configure_logging(LOG_PATH, debug)
 
     notifier = Notifier()

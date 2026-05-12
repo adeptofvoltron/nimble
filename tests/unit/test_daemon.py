@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -12,6 +13,94 @@ from nimble.skills.registry import SkillConfig, SkillRegistry, SkillWorker
 from nimble.skills.runner import DispatchResult, SkillError
 
 from tests.conftest import FakeNotifier
+
+
+# --- _load_dotenv tests ---
+
+
+def test_load_dotenv_sets_variables(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("FOO=bar\nBAZ=qux\n")
+    env_backup = dict(os.environ)
+    try:
+        os.environ.pop("FOO", None)
+        os.environ.pop("BAZ", None)
+        daemon_module._load_dotenv(env_file)
+        assert os.environ.get("FOO") == "bar"
+        assert os.environ.get("BAZ") == "qux"
+    finally:
+        for key in ("FOO", "BAZ"):
+            os.environ.pop(key, None)
+        os.environ.update(env_backup)
+
+
+def test_load_dotenv_skips_missing_file(tmp_path: Path) -> None:
+    daemon_module._load_dotenv(tmp_path / ".env")  # must not raise
+
+
+def test_load_dotenv_does_not_override_existing(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("MY_KEY=from_dotenv\n")
+    os.environ["MY_KEY"] = "from_env"
+    try:
+        daemon_module._load_dotenv(env_file)
+        assert os.environ["MY_KEY"] == "from_env"
+    finally:
+        del os.environ["MY_KEY"]
+
+
+def test_load_dotenv_skips_comments_and_blank_lines(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("# comment\n\nVALID_KEY=hello\n")
+    os.environ.pop("VALID_KEY", None)
+    try:
+        daemon_module._load_dotenv(env_file)
+        assert os.environ.get("VALID_KEY") == "hello"
+    finally:
+        os.environ.pop("VALID_KEY", None)
+
+
+def test_load_dotenv_strips_quotes(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text('QUOTED="hello world"\nSINGLE=\'hi there\'\n')
+    for key in ("QUOTED", "SINGLE"):
+        os.environ.pop(key, None)
+    try:
+        daemon_module._load_dotenv(env_file)
+        assert os.environ.get("QUOTED") == "hello world"
+        assert os.environ.get("SINGLE") == "hi there"
+    finally:
+        for key in ("QUOTED", "SINGLE"):
+            os.environ.pop(key, None)
+
+
+def test_run_loads_dotenv_from_repo_root(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("NIMBLE_TEST_DOTENV_KEY=loaded\n")
+    os.environ.pop("NIMBLE_TEST_DOTENV_KEY", None)
+    mock_stop_event = MagicMock()
+    mock_stop_event.wait.return_value = None
+    try:
+        with (
+            patch("nimble.daemon.configure_logging"),
+            patch("nimble.daemon.get_adapter"),
+            patch("nimble.daemon.load_config") as mock_load_config,
+            patch("nimble.daemon.validate_skill_paths", return_value=[]),
+            patch("nimble.daemon.SkillRunner"),
+            patch("nimble.daemon.ConfigWatcher"),
+            patch("nimble.daemon.write_pid"),
+            patch("nimble.daemon.remove_pid"),
+            patch("nimble.daemon.write_state"),
+            patch("nimble.daemon.remove_state"),
+            patch("nimble.daemon.Notifier"),
+            patch("threading.Event", return_value=mock_stop_event),
+            patch("nimble.daemon.threading.Thread"),
+        ):
+            mock_load_config.return_value.skills = []
+            daemon_module.run(tmp_path)
+        assert os.environ.get("NIMBLE_TEST_DOTENV_KEY") == "loaded"
+    finally:
+        os.environ.pop("NIMBLE_TEST_DOTENV_KEY", None)
 
 
 def test_dispatch_fires_notification_on_skill_error() -> None:
