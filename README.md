@@ -26,6 +26,8 @@ nimble add ctrl+shift+d https://github.com/user/nimble-log-diagnosis
 
 Nimble fetches `manifest.yaml`, displays the declared permissions, and prompts for confirmation before installing anything. Dependencies are isolated in `.nimble/skills/<name>/.venv/`. The binding is appended to `config.yaml` and the daemon picks it up without a restart.
 
+See **[COMMUNITY_SKILLS.md](COMMUNITY_SKILLS.md)** for a list of known community skills.
+
 ## Write your first skill
 
 Create a Python file anywhere under `skills/`, then add a binding in `config.yaml`. No imports needed — Nimble injects `context` and `tools` at call time.
