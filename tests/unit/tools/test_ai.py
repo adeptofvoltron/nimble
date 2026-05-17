@@ -72,7 +72,7 @@ def test_ask_with_system_prompt_anthropic() -> None:
         patch.dict("os.environ", {"TEST_KEY": "sk-fake"}),
         patch.dict("sys.modules", {"anthropic": mock_anthropic}),
     ):
-        tool.ask("hello", prompt="You are helpful")
+        tool.ask("hello", system_prompt="You are helpful")
 
     call_kwargs = mock_client.messages.create.call_args.kwargs
     assert call_kwargs.get("system") == "You are helpful"
@@ -88,7 +88,7 @@ def test_ask_with_system_prompt_openai() -> None:
         patch.dict("os.environ", {"TEST_KEY": "sk-fake"}),
         patch.dict("sys.modules", {"openai": mock_openai}),
     ):
-        tool.ask("hello", prompt="You are helpful")
+        tool.ask("hello", system_prompt="You are helpful")
 
     call_kwargs = mock_client.chat.completions.create.call_args.kwargs
     messages = call_kwargs["messages"]

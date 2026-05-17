@@ -48,6 +48,17 @@ def test_validate_multiple_skills_first_missing_raises(tmp_path: Path) -> None:
     assert "first-missing" in str(exc_info.value)
 
 
+def test_validate_path_traversal_raises_config_error(tmp_path: Path) -> None:
+    base = tmp_path / "repo"
+    base.mkdir()
+    outside = tmp_path / "secret.py"
+    outside.write_text("sensitive = True\n")
+    configs = [_make_config("evil-skill", "../secret.py")]
+    with pytest.raises(ConfigError) as exc_info:
+        validate_skill_paths(configs, base)
+    assert "evil-skill" in str(exc_info.value)
+
+
 def test_full_chain_parser_loader_registry(tmp_path: Path) -> None:
     skill_file = tmp_path / "skills" / "hello.py"
     skill_file.parent.mkdir()

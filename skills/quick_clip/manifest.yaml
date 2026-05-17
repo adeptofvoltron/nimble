@@ -1,0 +1,9 @@
+name: quick_clip
+version: "1.0.0"
+api_version: 1
+description: "Shows current clipboard content in a popup"
+entrypoint: skill.py
+class_name: QuickClipSkill
+permissions: []
+dependencies: []
+author: "Nimble Demo"

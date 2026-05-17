@@ -22,4 +22,11 @@ build/
 
 .nimble
 config.yaml
+
+# Agentic planning artifacts
+docs/superpowers/
+
+# Superseded X11 keepalive prototype
+x11_keepalive.py
+
 .env
