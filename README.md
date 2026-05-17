@@ -18,6 +18,13 @@ To stop:
 ```bash
 nimble stop
 ```
+## Install a community skill
+
+```bash
+nimble add ctrl+shift+d https://github.com/user/nimble-log-diagnosis
+```
+
+Nimble fetches `manifest.yaml`, displays the declared permissions, and prompts for confirmation before installing anything. Dependencies are isolated in `.nimble/skills/<name>/.venv/`. The binding is appended to `config.yaml` and the daemon picks it up without a restart.
 
 ## Write your first skill
 
@@ -50,14 +57,6 @@ skills:
 Restart the daemon (`nimble restart`) and press **`ctrl+shift+g`**.
 
 > **Note:** `context` and `tools` must have **no type annotations** in the method signature — skills run in a subprocess that may not have `nimble` installed.
-
-## Install a community skill
-
-```bash
-nimble add ctrl+shift+d https://github.com/user/nimble-log-diagnosis
-```
-
-Nimble fetches `manifest.yaml`, displays the declared permissions, and prompts for confirmation before installing anything. Dependencies are isolated in `.nimble/skills/<name>/.venv/`. The binding is appended to `config.yaml` and the daemon picks it up without a restart.
 
 ## Security model
 
