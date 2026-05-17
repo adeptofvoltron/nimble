@@ -1,0 +1,9 @@
+name: greet
+version: "1.0.0"
+api_version: 1
+description: "Greets you with the name of the active application"
+entrypoint: skill.py
+class_name: GreetSkill
+permissions: []
+dependencies: []
+author: "Kotmin"
