@@ -37,16 +37,23 @@ class AiTool:
                 "anthropic package not installed; add 'anthropic' to your"
                 " skill's manifest.yaml dependencies"
             )
+        from anthropic.types import MessageParam, TextBlock
+
         client = anthropic.Anthropic(api_key=api_key)
-        kwargs: dict[str, object] = {
-            "model": self._config.model,  # type: ignore[union-attr]
-            "max_tokens": 1024,
-            "messages": [{"role": "user", "content": text}],
-        }
+        messages: list[MessageParam] = [{"role": "user", "content": text}]
+        model: str = self._config.model  # type: ignore[union-attr]
         if system_prompt is not None:
-            kwargs["system"] = system_prompt
-        response = client.messages.create(**kwargs)
-        return str(response.content[0].text)
+            response = client.messages.create(
+                model=model, max_tokens=1024, messages=messages, system=system_prompt
+            )
+        else:
+            response = client.messages.create(
+                model=model, max_tokens=1024, messages=messages
+            )
+        for block in response.content:
+            if isinstance(block, TextBlock):
+                return block.text
+        raise RuntimeError("Anthropic response contained no text block")
 
     def _ask_openai(self, text: str, system_prompt: str | None, api_key: str) -> str:
         try:
@@ -56,8 +63,10 @@ class AiTool:
                 "openai package not installed; add 'openai' to your"
                 " skill's manifest.yaml dependencies"
             )
+        from openai.types.chat import ChatCompletionMessageParam
+
         client = openai.OpenAI(api_key=api_key)
-        messages: list[dict[str, str]] = []
+        messages: list[ChatCompletionMessageParam] = []
         if system_prompt is not None:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": text})

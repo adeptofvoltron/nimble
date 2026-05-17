@@ -8,17 +8,22 @@ from nimble.manifest.parser import AiConfig
 from nimble.tools.ai import AiTool
 
 
-def _make_anthropic_mock(response_text: str) -> MagicMock:
+def _make_anthropic_mock(response_text: str) -> tuple[MagicMock, MagicMock]:
     mock_response = MagicMock()
     mock_response.content = [MagicMock(text=response_text)]
     mock_client = MagicMock()
     mock_client.messages.create.return_value = mock_response
     mock_anthropic = MagicMock()
     mock_anthropic.Anthropic.return_value = mock_client
-    return mock_anthropic
+
+    mock_types = MagicMock()
+    mock_types.TextBlock = MagicMock  # isinstance(MagicMock(), MagicMock) is True
+    mock_types.MessageParam = dict
+
+    return mock_anthropic, mock_types
 
 
-def _make_openai_mock(response_text: str) -> MagicMock:
+def _make_openai_mock(response_text: str) -> tuple[MagicMock, MagicMock]:
     mock_message = MagicMock()
     mock_message.content = response_text
     mock_choice = MagicMock()
@@ -29,7 +34,10 @@ def _make_openai_mock(response_text: str) -> MagicMock:
     mock_client.chat.completions.create.return_value = mock_response
     mock_openai = MagicMock()
     mock_openai.OpenAI.return_value = mock_client
-    return mock_openai
+
+    mock_types_chat = MagicMock()
+
+    return mock_openai, mock_types_chat
 
 
 def test_ask_anthropic_returns_text() -> None:
@@ -37,11 +45,14 @@ def test_ask_anthropic_returns_text() -> None:
         provider="anthropic", model="claude-sonnet-4-6", api_key_env="TEST_KEY"
     )
     tool = AiTool(cfg)
-    mock_anthropic = _make_anthropic_mock("answer text")
+    mock_anthropic, mock_types = _make_anthropic_mock("answer text")
 
     with (
         patch.dict("os.environ", {"TEST_KEY": "sk-fake"}),
-        patch.dict("sys.modules", {"anthropic": mock_anthropic}),
+        patch.dict(
+            "sys.modules",
+            {"anthropic": mock_anthropic, "anthropic.types": mock_types},
+        ),
     ):
         result = tool.ask("hello")
     assert result == "answer text"
@@ -50,11 +61,14 @@ def test_ask_anthropic_returns_text() -> None:
 def test_ask_openai_returns_text() -> None:
     cfg = AiConfig(provider="openai", model="gpt-4o", api_key_env="TEST_KEY")
     tool = AiTool(cfg)
-    mock_openai = _make_openai_mock("answer text")
+    mock_openai, mock_types_chat = _make_openai_mock("answer text")
 
     with (
         patch.dict("os.environ", {"TEST_KEY": "sk-fake"}),
-        patch.dict("sys.modules", {"openai": mock_openai}),
+        patch.dict(
+            "sys.modules",
+            {"openai": mock_openai, "openai.types.chat": mock_types_chat},
+        ),
     ):
         result = tool.ask("hello")
     assert result == "answer text"
@@ -65,12 +79,15 @@ def test_ask_with_system_prompt_anthropic() -> None:
         provider="anthropic", model="claude-sonnet-4-6", api_key_env="TEST_KEY"
     )
     tool = AiTool(cfg)
-    mock_anthropic = _make_anthropic_mock("ok")
+    mock_anthropic, mock_types = _make_anthropic_mock("ok")
     mock_client = mock_anthropic.Anthropic.return_value
 
     with (
         patch.dict("os.environ", {"TEST_KEY": "sk-fake"}),
-        patch.dict("sys.modules", {"anthropic": mock_anthropic}),
+        patch.dict(
+            "sys.modules",
+            {"anthropic": mock_anthropic, "anthropic.types": mock_types},
+        ),
     ):
         tool.ask("hello", system_prompt="You are helpful")
 
@@ -81,12 +98,15 @@ def test_ask_with_system_prompt_anthropic() -> None:
 def test_ask_with_system_prompt_openai() -> None:
     cfg = AiConfig(provider="openai", model="gpt-4o", api_key_env="TEST_KEY")
     tool = AiTool(cfg)
-    mock_openai = _make_openai_mock("ok")
+    mock_openai, mock_types_chat = _make_openai_mock("ok")
     mock_client = mock_openai.OpenAI.return_value
 
     with (
         patch.dict("os.environ", {"TEST_KEY": "sk-fake"}),
-        patch.dict("sys.modules", {"openai": mock_openai}),
+        patch.dict(
+            "sys.modules",
+            {"openai": mock_openai, "openai.types.chat": mock_types_chat},
+        ),
     ):
         tool.ask("hello", system_prompt="You are helpful")
 
